@@ -41,6 +41,27 @@
         return token;
     }
 
+    // This function can be used to leave a comment on a specific PR
+    function LeaveCommentOnPR(commentLink, comment) {
+        // Send the POST request to the GitHub API
+        // TODO: Use Octokit to create requests
+        fetch(commentLink, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${EnsureToken()}`,
+                'Accept': 'application/vnd.github+json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                'body': comment
+            })
+        }).then((response) => {
+            console.log('response to ', commentLink, response)
+        }).catch((error) => {
+            console.log('error on ', commentLink, error)
+        })
+    }
+
     function CreateFileLink() {
 
         // Get all div elements with an id that starts with "issue_"
