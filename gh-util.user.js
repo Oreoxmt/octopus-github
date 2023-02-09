@@ -147,10 +147,18 @@
         }
     }
 
+    function Init() {
+
+        const observer = new MutationObserver(() => {
+            document.querySelectorAll('div[id^="issue_"]').forEach((element) => {
+                EnsureFileLink(element);
+            })
+            EnsureCommentButton();
+        });
+        const config = { childList: true, subtree: true };
+        observer.observe(document, config);
     }
 
-    // TODO: Do this everytime on switching to new page
-    CreateCommentButton();
-    CreateFileLink();
+    Init();
 
 })();
