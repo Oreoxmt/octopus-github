@@ -62,6 +62,49 @@
         })
     }
 
+    // TODO: Use toggle instead of button, and add more features to the toggle, e.g., editing tokens.
+    function CreateCommentButton() {
+        // First, find the "table-list-header-toggle" div
+        var toggleDiv = document.querySelector('.table-list-header-toggle.float-right');
+
+        // Next, create a button element and add it to the page
+        var button = document.createElement('button');
+        button.innerHTML = 'Comment';
+        button.setAttribute('class', 'btn btn-sm js-details-target d-inline-block float-left float-none m-0 mr-md-0 js-title-edit-button')
+        toggleDiv.appendChild(button);
+
+        // Next, add an event listener to the button to listen for clicks
+        button.addEventListener('click', function () {
+            EnsureToken();
+
+            // Get a list of all the checkboxes on the page (these are used to select PRs)
+            var checkboxes = document.querySelectorAll('input[type=checkbox][data-check-all-item]');
+
+            // Iterate through the checkboxes and get the ones that are checked
+            var selectedPRs = [];
+
+            checkboxes.forEach(function (checkbox) {
+                if (checkbox.checked) {
+                    selectedPRs.push(checkbox.value);
+                }
+            })
+
+            // Prompt the user for a comment to leave on the selected PRs
+            var comment = prompt('Enter a comment to leave on the selected PRs:');
+            if (!comment) {
+                return;
+            }
+            var repo = GetRepositoryInformation();
+
+            // Leave the comment on each selected PR
+            selectedPRs.forEach(function (pr) {
+                var commentLink = `https://api.github.com/repos/${repo.owner}/${repo.name}/issues/${pr}/comments`;
+                // Leave a comment on the PR
+                LeaveCommentOnPR(commentLink, comment);
+            });
+        });
+    }
+
     function CreateFileLink() {
 
         // Get all div elements with an id that starts with "issue_"
@@ -92,6 +135,8 @@
 
     }
 
+    // TODO: Do this everytime on switching to new page
+    CreateCommentButton();
     CreateFileLink();
 
 })();
