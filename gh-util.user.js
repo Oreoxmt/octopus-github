@@ -65,7 +65,11 @@
     }
 
     // TODO: Use toggle instead of button, and add more features to the toggle, e.g., editing tokens.
+    function EnsureCommentButton() {
         const MARK = 'comment-button'
+        if (document.querySelector(`button[${ATTR}="${MARK}"]`)) {
+            return;
+        }
         // First, find the "table-list-header-toggle" div
         var toggleDiv = document.querySelector('.table-list-header-toggle.float-right');
 
