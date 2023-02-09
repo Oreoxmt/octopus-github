@@ -1,16 +1,18 @@
 // ==UserScript==
 // @name         Octopus GitHub
-// @version      0.1
+// @version      0.2
 // @description  A userscript for GitHub
 // @author       Oreo
 // @match        https://github.com/*/pulls*
 // @grant        none
+// @run-at       document-start
 // ==/UserScript==
 
 (function () {
 
     'use strict';
 
+    const ATTR = 'octopus-github-util-mark'
     const STORAGEKEY = 'octopus-github-util:token'
 
     function GetRepositoryInformation() {
@@ -63,7 +65,11 @@
     }
 
     // TODO: Use toggle instead of button, and add more features to the toggle, e.g., editing tokens.
-    function CreateCommentButton() {
+    function EnsureCommentButton() {
+        const MARK = 'comment-button'
+        if (document.querySelector(`button[${ATTR}="${MARK}"]`)) {
+            return;
+        }
         // First, find the "table-list-header-toggle" div
         var toggleDiv = document.querySelector('.table-list-header-toggle.float-right');
 
@@ -71,6 +77,7 @@
         var button = document.createElement('button');
         button.innerHTML = 'Comment';
         button.setAttribute('class', 'btn btn-sm js-details-target d-inline-block float-left float-none m-0 mr-md-0 js-title-edit-button')
+        button.setAttribute(ATTR, MARK)
         toggleDiv.appendChild(button);
 
         // Next, add an event listener to the button to listen for clicks
@@ -105,38 +112,53 @@
         });
     }
 
-    function CreateFileLink() {
+    function EnsureFileLink(issueElement) {
+        const MARK = 'file-link-span'
 
-        // Get all div elements with an id that starts with "issue_"
-        var issueElements = document.querySelectorAll('div[id^="issue_"]');
-        issueElements.forEach((element) => {
-            var issueId = element.getAttribute("id")
-            var originalLinkElement = document.getElementById(issueId + "_link")
-            var originalLink = originalLinkElement.getAttribute("href")
-            var newLink = originalLink + "/files"
-            // Get all span elements within the current element
-            var spanElements = element.querySelectorAll('span[class="opened-by"]');
-            if (spanElements.length == 1) {
-                var openedBy = spanElements[0];
-                var linkSpanElement = document.createElement('span');
-                linkSpanElement.setAttribute('class', 'd-inline-block mr-1')
-                var dotSpanElement = document.createElement('span');
-                dotSpanElement.innerHTML = ' • ';
-                dotSpanElement.setAttribute('class', 'd-inline-block mr-1')
-                var linkElement = document.createElement('a')
-                linkElement.setAttribute('href', newLink)
-                linkElement.setAttribute('class', 'Link--muted')
-                linkElement.innerHTML = "Files"
-                linkSpanElement.appendChild(linkElement)
-                openedBy.insertAdjacentElement('beforebegin', linkSpanElement)
-                openedBy.insertAdjacentElement('beforebegin', dotSpanElement);
-            }
-        })
+        if (issueElement.querySelector(`span[${ATTR}="${MARK}"]`)) {
+            return; // Already added
+        }
 
+        var issueId = issueElement.getAttribute("id")
+        var originalLinkElement = document.getElementById(issueId + "_link")
+        if (!originalLinkElement) {
+            return; // Element is not ready
+        }
+
+        var originalLink = originalLinkElement.getAttribute("href")
+        var newLink = originalLink + "/files"
+
+        var openedByElement = issueElement.querySelectorAll('span[class="opened-by"]');
+        if (openedByElement.length == 1) {
+            var openedBy = openedByElement[0];
+            var linkSpanElement = document.createElement('span');
+            linkSpanElement.setAttribute('class', 'd-inline-block mr-1 custom')
+            linkSpanElement.setAttribute(ATTR, MARK)
+            var dotSpanElement = document.createElement('span');
+            dotSpanElement.innerHTML = ' • ';
+            dotSpanElement.setAttribute('class', 'd-inline-block mr-1 custom')
+            var linkElement = document.createElement('a')
+            linkElement.setAttribute('href', newLink)
+            linkElement.setAttribute('class', 'Link--muted')
+            linkElement.innerHTML = "Files"
+            linkSpanElement.appendChild(linkElement)
+            openedBy.insertAdjacentElement('beforebegin', linkSpanElement)
+            openedBy.insertAdjacentElement('beforebegin', dotSpanElement);
+        }
     }
 
-    // TODO: Do this everytime on switching to new page
-    CreateCommentButton();
-    CreateFileLink();
+    function Init() {
+
+        const observer = new MutationObserver(() => {
+            document.querySelectorAll('div[id^="issue_"]').forEach((element) => {
+                EnsureFileLink(element);
+            })
+            EnsureCommentButton();
+        });
+        const config = { childList: true, subtree: true };
+        observer.observe(document, config);
+    }
+
+    Init();
 
 })();
