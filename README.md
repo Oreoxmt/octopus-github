@@ -1,4 +1,4 @@
-# octopus-github
+# octopus-github  [TRY](https://raw.githubusercontent.com/Oreoxmt/octopus-github/main/gh-util.user.js)
 
 A userscript for GitHub with the following features:
 
