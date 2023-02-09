@@ -112,33 +112,40 @@
         });
     }
 
-    function CreateFileLink() {
+    function EnsureFileLink(issueElement) {
+        const MARK = 'file-link-span'
 
-        // Get all div elements with an id that starts with "issue_"
-        var issueElements = document.querySelectorAll('div[id^="issue_"]');
-        issueElements.forEach((element) => {
-            var issueId = element.getAttribute("id")
-            var originalLinkElement = document.getElementById(issueId + "_link")
-            var originalLink = originalLinkElement.getAttribute("href")
-            var newLink = originalLink + "/files"
-            // Get all span elements within the current element
-            var spanElements = element.querySelectorAll('span[class="opened-by"]');
-            if (spanElements.length == 1) {
-                var openedBy = spanElements[0];
-                var linkSpanElement = document.createElement('span');
-                linkSpanElement.setAttribute('class', 'd-inline-block mr-1')
-                var dotSpanElement = document.createElement('span');
-                dotSpanElement.innerHTML = ' • ';
-                dotSpanElement.setAttribute('class', 'd-inline-block mr-1')
-                var linkElement = document.createElement('a')
-                linkElement.setAttribute('href', newLink)
-                linkElement.setAttribute('class', 'Link--muted')
-                linkElement.innerHTML = "Files"
-                linkSpanElement.appendChild(linkElement)
-                openedBy.insertAdjacentElement('beforebegin', linkSpanElement)
-                openedBy.insertAdjacentElement('beforebegin', dotSpanElement);
-            }
-        })
+        if (issueElement.querySelector(`span[${ATTR}="${MARK}"]`)) {
+            return; // Already added
+        }
+
+        var issueId = issueElement.getAttribute("id")
+        var originalLinkElement = document.getElementById(issueId + "_link")
+        if (!originalLinkElement) {
+            return; // Element is not ready
+        }
+
+        var originalLink = originalLinkElement.getAttribute("href")
+        var newLink = originalLink + "/files"
+
+        var openedByElement = issueElement.querySelectorAll('span[class="opened-by"]');
+        if (openedByElement.length == 1) {
+            var openedBy = openedByElement[0];
+            var linkSpanElement = document.createElement('span');
+            linkSpanElement.setAttribute('class', 'd-inline-block mr-1 custom')
+            linkSpanElement.setAttribute(ATTR, MARK)
+            var dotSpanElement = document.createElement('span');
+            dotSpanElement.innerHTML = ' • ';
+            dotSpanElement.setAttribute('class', 'd-inline-block mr-1 custom')
+            var linkElement = document.createElement('a')
+            linkElement.setAttribute('href', newLink)
+            linkElement.setAttribute('class', 'Link--muted')
+            linkElement.innerHTML = "Files"
+            linkSpanElement.appendChild(linkElement)
+            openedBy.insertAdjacentElement('beforebegin', linkSpanElement)
+            openedBy.insertAdjacentElement('beforebegin', dotSpanElement);
+        }
+    }
 
     }
 
