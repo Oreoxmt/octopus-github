@@ -11,6 +11,8 @@
 
     'use strict';
 
+    const STORAGEKEY = 'octopus-github-util:token'
+
     function GetRepositoryInformation() {
         // Get the pathname of the current page
         var pathname = location.pathname;
@@ -24,6 +26,21 @@
             name: parts[2],
         }
     }
+
+    function EnsureToken() {
+        var token = localStorage.getItem(STORAGEKEY)
+        if (!token) {
+            // Prompt user to set token
+            // TODO: Use HTML element instead of prompt
+            token = prompt('Enter your GitHub token:');
+            if (!token) {
+                throw 'No token set'
+            }
+            localStorage.setItem(STORAGEKEY, token);
+        }
+        return token;
+    }
+
     function CreateFileLink() {
 
         // Get all div elements with an id that starts with "issue_"
