@@ -11,6 +11,19 @@
 
     'use strict';
 
+    function GetRepositoryInformation() {
+        // Get the pathname of the current page
+        var pathname = location.pathname;
+
+        // Split the pathname into an array of parts
+        var parts = pathname.split('/');
+
+        // Return an object containing the user name and repository name
+        return {
+            owner: parts[1],
+            name: parts[2],
+        }
+    }
     function CreateFileLink() {
 
         // Get all div elements with an id that starts with "issue_"
