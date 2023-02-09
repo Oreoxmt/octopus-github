@@ -5,6 +5,7 @@
 // @author       Oreo
 // @match        https://github.com/*/pulls*
 // @grant        none
+// @run-at       document-start
 // ==/UserScript==
 
 (function () {
