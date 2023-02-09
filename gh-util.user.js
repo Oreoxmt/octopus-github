@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Octopus GitHub
-// @version      0.1
+// @version      0.2
 // @description  A userscript for GitHub
 // @author       Oreo
 // @match        https://github.com/*/pulls*
