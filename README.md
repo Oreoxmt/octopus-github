@@ -15,6 +15,20 @@ A userscript for GitHub with the following features:
 
 ## FAQs
 
+### How to update the userscript?
+
+The following uses Tampermonkey as an example.
+
+1. Click the Tampermonkey icon in the browser toolbar.
+
+2. Click **Dashboard**. The Tampermonkey dashboard is displayed.
+
+3. Click **Installed userscripts**. The list of installed userscripts is displayed.
+
+4. Select **Octopus GitHub**.
+
+5. Choose **Trigger update** from the **Apply this to all selected scripts** menu and click **Start**. The userscript is updated to the latest version.
+
 ### Why is the bulk comment feature not working?
 
 1. Check if you have configured a Github personal access token.
