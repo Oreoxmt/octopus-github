@@ -12,6 +12,7 @@
 
     'use strict';
 
+    const ATTR = 'octopus-github-util-mark'
     const STORAGEKEY = 'octopus-github-util:token'
 
     function GetRepositoryInformation() {
@@ -64,7 +65,7 @@
     }
 
     // TODO: Use toggle instead of button, and add more features to the toggle, e.g., editing tokens.
-    function CreateCommentButton() {
+        const MARK = 'comment-button'
         // First, find the "table-list-header-toggle" div
         var toggleDiv = document.querySelector('.table-list-header-toggle.float-right');
 
@@ -72,6 +73,7 @@
         var button = document.createElement('button');
         button.innerHTML = 'Comment';
         button.setAttribute('class', 'btn btn-sm js-details-target d-inline-block float-left float-none m-0 mr-md-0 js-title-edit-button')
+        button.setAttribute(ATTR, MARK)
         toggleDiv.appendChild(button);
 
         // Next, add an event listener to the button to listen for clicks
