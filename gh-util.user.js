@@ -148,13 +148,17 @@
     }
 
     function Init() {
-
-        const observer = new MutationObserver(() => {
+        // run the script when dom is ready
+        const enhanceGitHub = () => {
             document.querySelectorAll('div[id^="issue_"]').forEach((element) => {
                 EnsureFileLink(element);
             })
             EnsureCommentButton();
-        });
+        }
+
+        document.addEventListener('DOMContentLoaded', enhanceGitHub);
+
+        const observer = new MutationObserver(enhanceGitHub);
         const config = { childList: true, subtree: true };
         observer.observe(document, config);
     }
