@@ -1,9 +1,10 @@
 // ==UserScript==
 // @name         Octopus GitHub
-// @version      0.2
+// @version      0.3
 // @description  A userscript for GitHub
 // @author       Oreo
 // @match        https://github.com/*/pulls*
+// @match        https://github.com/*/pull/*
 // @grant        none
 // @run-at       document-start
 // ==/UserScript==
@@ -76,8 +77,8 @@
         // Next, create a button element and add it to the page
         var button = document.createElement('button');
         button.innerHTML = 'Comment';
-        button.setAttribute('class', 'btn btn-sm js-details-target d-inline-block float-left float-none m-0 mr-md-0 js-title-edit-button')
-        button.setAttribute(ATTR, MARK)
+        button.setAttribute('class', 'btn btn-sm js-details-target d-inline-block float-left float-none m-0 mr-md-0 js-title-edit-button');
+        button.setAttribute(ATTR, MARK);
         toggleDiv.appendChild(button);
 
         // Next, add an event listener to the button to listen for clicks
@@ -147,16 +148,105 @@
         }
     }
 
+    // This function creates a button that scrolls to top of the page
+    function EnsureScrollToTopButton() {
+        const MARK = 'scroll-to-top-button';
+
+        if (document.querySelector(`button[${ATTR}="${MARK}"]`)) {
+            return;
+        }
+
+        // create the button
+        var button = document.createElement('button');
+        button.innerHTML = '&uarr;';
+
+        // set position and style for the button
+        button.style.position = "fixed";
+        button.style.bottom = "55px";
+        button.style.right = "20px";
+        button.style.zIndex = "999"; // always on top
+        button.style.width = "30px";
+        button.style.display = "none"; // initially hidden
+        button.className = "js-details-target js-title-edit-button flex-md-order-2 Button--secondary Button--small Button m-0 mr-md-0";
+
+        // trigger scrolling to top when button is clicked
+        button.addEventListener('click', function () {
+            window.scrollTo(0, 0);
+        });
+
+        // add the button to the page
+        document.body.appendChild(button);
+
+        // show the button only when not at the top
+        window.addEventListener("scroll", function() {
+            if (window.pageYOffset > 0) {
+              button.style.display = "block";
+            } else {
+              button.style.display = "none";
+            }
+          });
+    }
+
+    // This function creates a button that scrolls to bottom of the page
+    function EnsureScrollToBottomButton() {
+        const MARK = 'scroll-to-bottom-button';
+
+        if (document.querySelector(`button[${ATTR}="${MARK}"]`)) {
+          return;
+        }
+
+        // create the button
+        var button = document.createElement('button');
+        button.innerHTML = '&darr;';
+
+        // set position and style for the button
+        button.style.position = "fixed";
+        button.style.bottom = "20px";
+        button.style.right = "20px";
+        button.style.zIndex = "999"; // always on top
+        button.style.width = "30px";
+        button.className = "js-details-target js-title-edit-button flex-md-order-2 Button--secondary Button--small Button m-0 mr-md-0";
+
+        // trigger scrolling to bottom when button is clicked
+        button.addEventListener('click', function () {
+          window.scrollTo(0, document.body.scrollHeight);
+        });
+
+        // add the button to the page
+        document.body.appendChild(button);
+
+        // show the button only when not at the bottom
+        window.addEventListener("scroll", function() {
+          if (window.pageYOffset + window.innerHeight < document.body.scrollHeight) {
+            button.style.display = "block";
+          } else {
+            button.style.display = "none";
+          }
+        });
+      }
+
+
     function Init() {
 
-        const observer = new MutationObserver(() => {
-            document.querySelectorAll('div[id^="issue_"]').forEach((element) => {
-                EnsureFileLink(element);
-            })
-            EnsureCommentButton();
-        });
-        const config = { childList: true, subtree: true };
-        observer.observe(document, config);
+        const url = window.location.href;
+
+        // If we are on the PR list page, add the comment button and file link
+        if (url.includes('/pulls')) {
+            const observer = new MutationObserver(() => {
+                document.querySelectorAll('div[id^="issue_"]').forEach((element) => {
+                    EnsureFileLink(element);
+                })
+                EnsureCommentButton();
+            });
+            const config = { childList: true, subtree: true };
+            observer.observe(document, config);
+        }
+
+        // If we are on the PR details page, add the scroll to top and bottom buttons
+        if (url.includes('/pull/')) {
+            EnsureScrollToTopButton();
+            EnsureScrollToBottomButton();
+        }
     }
 
     Init();
