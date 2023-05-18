@@ -6,7 +6,7 @@
 // @match        https://github.com/*/pulls*
 // @match        https://github.com/*/pull/*
 // @grant        none
-// @run-at       document-start
+// @run-at       document-end
 // ==/UserScript==
 
 (function () {
@@ -110,6 +110,47 @@
                 // Leave a comment on the PR
                 LeaveCommentOnPR(commentLink, comment);
             });
+        });
+    }
+
+    function EnsureCommentButtonOnPR() {
+        const MARK = "comment-button-pr";
+        if (document.querySelector(`button[${ATTR}="${MARK}"]`)) {
+            return;
+        }
+        // First, find the "table-list-header-toggle" div
+        var headerActions = document.querySelector(".gh-header-actions");
+
+        // Next, create a button element and add it to the page
+        var button = document.createElement("button");
+        button.innerHTML = "Comment";
+        button.setAttribute(
+            "class",
+            "flex-md-order-2 Button--secondary Button--small Button m-0 mr-md-0"
+        );
+        button.setAttribute(ATTR, MARK);
+        headerActions.appendChild(button);
+
+        // Next, add an event listener to the button to listen for clicks
+        button.addEventListener("click", function () {
+            EnsureToken();
+
+            // get the pr number
+            const url = window.location.href;
+            const urlSplit = url.split("/");
+            const index = urlSplit.indexOf("pull");
+            const pr = urlSplit[index + 1];
+
+            // Prompt the user for a comment to leave on the selected PRs
+            var comment = prompt("Enter a comment to leave on the selected PRs:");
+            if (!comment) {
+              return;
+            }
+            var repo = GetRepositoryInformation();
+
+            // Leave the comment on this PR
+            var commentLink = `https://api.github.com/repos/${repo.owner}/${repo.name}/issues/${pr}/comments`;
+            LeaveCommentOnPR(commentLink, comment);
         });
     }
 
@@ -246,9 +287,17 @@
         if (url.includes('/pull/')) {
             EnsureScrollToTopButton();
             EnsureScrollToBottomButton();
+
+            const observerCallback = () => {
+                EnsureCommentButtonOnPR();
+            };
+            const observer = new MutationObserver(observerCallback);
+            const targetNode = url.includes('files')
+                  ? document.body : document.querySelector(".js-issues-results");
+            const observerOptions = { childList: true, subtree: true };
+            observer.observe(targetNode, observerOptions);
         }
     }
 
     Init();
-
 })();
