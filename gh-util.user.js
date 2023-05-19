@@ -287,13 +287,12 @@
         if (url.includes('/pull/')) {
             EnsureScrollToTopButton();
             EnsureScrollToBottomButton();
+            EnsureCommentButtonOnPR();
 
-            const observerCallback = () => {
+            const observer = new MutationObserver(() => {
                 EnsureCommentButtonOnPR();
-            };
-            const observer = new MutationObserver(observerCallback);
-            const targetNode = url.includes('files')
-                  ? document.body : document.querySelector(".js-issues-results");
+            });
+            const targetNode = document.body;
             const observerOptions = { childList: true, subtree: true };
             observer.observe(targetNode, observerOptions);
         }
