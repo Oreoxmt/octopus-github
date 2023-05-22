@@ -3,6 +3,10 @@
 // @version      0.4
 // @description  A userscript for GitHub
 // @author       Oreo
+// @homepage     https://github.com/Oreoxmt/octopus-github
+// @updateURL    https://github.com/Oreoxmt/octopus-github/raw/main/gh-util.user.js
+// @downloadURL  https://github.com/Oreoxmt/octopus-github/raw/main/gh-util.user.js
+// @supportURL   https://github.com/Oreoxmt/octopus-github
 // @match        https://github.com/*/pulls*
 // @match        https://github.com/*/pull/*
 // @grant        none
