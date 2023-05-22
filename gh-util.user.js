@@ -1,8 +1,12 @@
 // ==UserScript==
 // @name         Octopus GitHub
-// @version      0.3
+// @version      0.4
 // @description  A userscript for GitHub
 // @author       Oreo
+// @homepage     https://github.com/Oreoxmt/octopus-github
+// @updateURL    https://github.com/Oreoxmt/octopus-github/raw/main/gh-util.user.js
+// @downloadURL  https://github.com/Oreoxmt/octopus-github/raw/main/gh-util.user.js
+// @supportURL   https://github.com/Oreoxmt/octopus-github
 // @match        https://github.com/*/pulls*
 // @match        https://github.com/*/pull/*
 // @grant        none
@@ -74,6 +78,9 @@
         // First, find the "table-list-header-toggle" div
         var toggleDiv = document.querySelector('.table-list-header-toggle.float-right');
 
+        if (!toggleDiv) {
+            return;
+        }
         // Next, create a button element and add it to the page
         var button = document.createElement('button');
         button.innerHTML = 'Comment';
