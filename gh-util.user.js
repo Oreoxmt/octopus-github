@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Octopus GitHub
-// @version      0.3
+// @version      0.4
 // @description  A userscript for GitHub
 // @author       Oreo
 // @match        https://github.com/*/pulls*
@@ -74,6 +74,9 @@
         // First, find the "table-list-header-toggle" div
         var toggleDiv = document.querySelector('.table-list-header-toggle.float-right');
 
+        if (!toggleDiv) {
+            return;
+        }
         // Next, create a button element and add it to the page
         var button = document.createElement('button');
         button.innerHTML = 'Comment';
