@@ -6,7 +6,7 @@
 // @match        https://github.com/*/pulls*
 // @match        https://github.com/*/pull/*
 // @grant        none
-// @run-at       document-end
+// @run-at       document-start
 // ==/UserScript==
 
 (function () {
@@ -120,6 +120,10 @@
         }
         // First, find the "table-list-header-toggle" div
         var headerActions = document.querySelector(".gh-header-actions");
+        
+        if (!headerActions) {
+            return;
+        }
 
         // Next, create a button element and add it to the page
         var button = document.createElement("button");
