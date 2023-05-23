@@ -120,6 +120,51 @@
         });
     }
 
+    function EnsureCommentButtonOnPR() {
+        const MARK = "comment-button-pr";
+        if (document.querySelector(`button[${ATTR}="${MARK}"]`)) {
+            return;
+        }
+        // First, find the "table-list-header-toggle" div
+        var headerActions = document.querySelector(".gh-header-actions");
+        
+        if (!headerActions) {
+            return;
+        }
+
+        // Next, create a button element and add it to the page
+        var button = document.createElement("button");
+        button.innerHTML = "Comment";
+        button.setAttribute(
+            "class",
+            "flex-md-order-2 Button--secondary Button--small Button m-0 mr-md-0"
+        );
+        button.setAttribute(ATTR, MARK);
+        headerActions.appendChild(button);
+
+        // Next, add an event listener to the button to listen for clicks
+        button.addEventListener("click", function () {
+            EnsureToken();
+
+            // get the pr number
+            const url = window.location.href;
+            const urlSplit = url.split("/");
+            const index = urlSplit.indexOf("pull");
+            const pr = urlSplit[index + 1];
+
+            // Prompt the user for a comment to leave on the selected PRs
+            var comment = prompt("Enter a comment to leave on the selected PRs:");
+            if (!comment) {
+              return;
+            }
+            var repo = GetRepositoryInformation();
+
+            // Leave the comment on this PR
+            var commentLink = `https://api.github.com/repos/${repo.owner}/${repo.name}/issues/${pr}/comments`;
+            LeaveCommentOnPR(commentLink, comment);
+        });
+    }
+
     function EnsureFileLink(issueElement) {
         const MARK = 'file-link-span'
 
@@ -253,9 +298,16 @@
         if (url.includes('/pull/')) {
             EnsureScrollToTopButton();
             EnsureScrollToBottomButton();
+            EnsureCommentButtonOnPR();
+
+            const observer = new MutationObserver(() => {
+                EnsureCommentButtonOnPR();
+            });
+            const targetNode = document.body;
+            const observerOptions = { childList: true, subtree: true };
+            observer.observe(targetNode, observerOptions);
         }
     }
 
     Init();
-
 })();
