@@ -127,7 +127,7 @@
         }
         // First, find the "table-list-header-toggle" div
         var headerActions = document.querySelector(".gh-header-actions");
-        
+
         if (!headerActions) {
             return;
         }
@@ -150,7 +150,12 @@
             const url = window.location.href;
             const urlSplit = url.split("/");
             const index = urlSplit.indexOf("pull");
-            const pr = urlSplit[index + 1];
+            let pr = urlSplit[index + 1];
+
+            // remove #... from the pr number
+            if (pr.includes('#')) {
+                pr = pr.split('#')[0];
+            }
 
             // Prompt the user for a comment to leave on the selected PRs
             var comment = prompt("Enter a comment to leave on the selected PRs:");
