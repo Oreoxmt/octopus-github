@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Octopus GitHub
-// @version      0.4
+// @version      0.5
 // @description  A userscript for GitHub
 // @author       Oreo
 // @homepage     https://github.com/Oreoxmt/octopus-github
@@ -127,7 +127,7 @@
         }
         // First, find the "table-list-header-toggle" div
         var headerActions = document.querySelector(".gh-header-actions");
-        
+
         if (!headerActions) {
             return;
         }
@@ -147,7 +147,7 @@
             EnsureToken();
 
             // get the pr number
-            const url = window.location.href;
+            const url = window.location.pathname;
             const urlSplit = url.split("/");
             const index = urlSplit.indexOf("pull");
             const pr = urlSplit[index + 1];
