@@ -147,7 +147,7 @@
             EnsureToken();
 
             // get the pr number
-            const url = window.location.href;
+            const url = window.location.pathname;
             const urlSplit = url.split("/");
             const index = urlSplit.indexOf("pull");
             let pr = urlSplit[index + 1];
