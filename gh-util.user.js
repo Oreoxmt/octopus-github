@@ -152,11 +152,6 @@
             const index = urlSplit.indexOf("pull");
             let pr = urlSplit[index + 1];
 
-            // remove #... from the pr number
-            if (pr.includes('#')) {
-                pr = pr.split('#')[0];
-            }
-
             // Prompt the user for a comment to leave on the selected PRs
             var comment = prompt("Enter a comment to leave on the selected PRs:");
             if (!comment) {
