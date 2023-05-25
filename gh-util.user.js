@@ -150,7 +150,7 @@
             const url = window.location.pathname;
             const urlSplit = url.split("/");
             const index = urlSplit.indexOf("pull");
-            let pr = urlSplit[index + 1];
+            const pr = urlSplit[index + 1];
 
             // Prompt the user for a comment to leave on the selected PRs
             var comment = prompt("Enter a comment to leave on the selected PRs:");
