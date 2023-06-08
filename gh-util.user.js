@@ -654,7 +654,6 @@
             observer.observe(document, config);
         }
 
-
         // If we are on the PR details page, add the scroll to top and bottom buttons
         if (url.includes('/pull/')) {
             EnsureScrollToTopButton();
