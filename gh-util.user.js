@@ -386,11 +386,9 @@
             //#const body = "This is test PR.";
             const labels = sourceLabels;
             const targetPRURL = await CreatePullRequest(octokit, messageTextElement, targetRepoOwner, targetRepoName, baseBranch, myRepoOwner, myRepoName, newBranchName, title, body, labels);
-            //@const targetPRURL = await CreatePullRequest(octokit, messageTextElement, targetRepoOwner, targetRepoName, baseBranch, myRepoOwner, myRepoName, newBranchName, title, body, labels);
             // 6. Delete the temporary temp.md file
             const CommitMessage2 = "Delete temp.md";
             await DeleteFileInBranch(octokit, myRepoOwner, myRepoName, newBranchName, filePath, CommitMessage2);
-
         } catch (error) {
             console.error("An error occurred:", error);
             return error;
