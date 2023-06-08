@@ -380,7 +380,6 @@
             const FileContent = "This is a test file.";
             const CommitMessage = "Add temp.md";
             await CreateFileInBranch(octokit, messageTextElement, myRepoOwner, myRepoName, newBranchName, filePath, FileContent, CommitMessage);
-            //#await CreateFileInBranch(octokit, messageTextElement, 'qiancai', 'docs', 'test060128', filePath, FileContent, CommitMessage);
             // 5. Create a pull request
             const title = sourceTitle;
             const body = UpdatePRDescription(SourcePRURL, SourceDescription, BaseRepo, targetRepoName);
