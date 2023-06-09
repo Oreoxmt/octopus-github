@@ -104,13 +104,9 @@
             })
                 .then(response => {
                 const PRData = response.data;
-
                 const sourceTitle = PRData.title;
                 const SourceDescription = PRData.body;
-                const excludeLabels = ["size", "translation", "status", "first-time-contributor", "contribution", "lgtm", "approved"];
-                const sourceLabels = PRData.labels
-                .filter(label => !excludeLabels.some(excludeLabel => label.name.includes(excludeLabel)))
-                .map(label => label.name);
+                const sourceLabels = PRData.labels.map(label => label.name);
                 const BaseRepo = PRData.base.repo.full_name;
                 const baseBranch = PRData.base.ref;
                 const headRepo = PRData.head.repo.full_name;
@@ -371,24 +367,32 @@
             const myRepoOwner = await GetMyGitHubID();
             //2.Get the source PR information
             const [sourceTitle, SourceDescription, sourceLabels, BaseRepo, baseBranch, headRepo, headBranch, PRNumber] = await GetPRInfo(octokit, messageTextElement, SourcePRURL);
-            await SyncMyRepoBranch(octokit, messageTextElement, targetRepoOwner, targetRepoName, myRepoOwner, myRepoName, baseBranch);
-            //3.Create a new branch in the repository that I forked
-            const newBranchName = `${headBranch}-${PRNumber}`;
-            await CreateBranch(octokit, messageTextElement, myRepoOwner, myRepoName, newBranchName, baseBranch);
-            //4. Create a temporary temp.md file in the new branch
-            const filePath = "temp.md";
-            const FileContent = "This is a test file.";
-            const CommitMessage = "Add temp.md";
-            await CreateFileInBranch(octokit, messageTextElement, myRepoOwner, myRepoName, newBranchName, filePath, FileContent, CommitMessage);
-            // 5. Create a pull request
-            const title = sourceTitle;
-            const body = UpdatePRDescription(SourcePRURL, SourceDescription, BaseRepo, targetRepoName);
-            //#const body = "This is test PR.";
-            const labels = sourceLabels;
-            const targetPRURL = await CreatePullRequest(octokit, messageTextElement, targetRepoOwner, targetRepoName, baseBranch, myRepoOwner, myRepoName, newBranchName, title, body, labels);
-            // 6. Delete the temporary temp.md file
-            const CommitMessage2 = "Delete temp.md";
-            await DeleteFileInBranch(octokit, myRepoOwner, myRepoName, newBranchName, filePath, CommitMessage2);
+            const excludeLabels = ["size", "translation", "status", "first-time-contributor", "contribution", "lgtm", "approved"];
+            const targetLabels = sourceLabels.filter(label => !excludeLabels.some(excludeLabel => label.includes(excludeLabel)));
+            if (!sourceLabels.includes("translation/done")) {
+                // Proceed with the PR creation only if the translation/done label is not added for the current source PR
+                //3.Create a new branch in the repository that I forked
+                await SyncMyRepoBranch(octokit, messageTextElement, targetRepoOwner, targetRepoName, myRepoOwner, myRepoName, baseBranch);
+                const newBranchName = `${headBranch}-${PRNumber}`;
+                await CreateBranch(octokit, messageTextElement, myRepoOwner, myRepoName, newBranchName, baseBranch);
+                //4. Create a temporary temp.md file in the new branch
+                const filePath = "temp.md";
+                const FileContent = "This is a test file.";
+                const CommitMessage = "Add temp.md";
+                await CreateFileInBranch(octokit, messageTextElement, myRepoOwner, myRepoName, newBranchName, filePath, FileContent, CommitMessage);
+                // 5. Create a pull request
+                const title = sourceTitle;
+                //@const body = UpdatePRDescription(SourcePRURL, SourceDescription, BaseRepo, targetRepoName);
+                const body = "This is test PR.";
+                const labels = targetLabels;
+                const targetPRURL = await CreatePullRequest(octokit, messageTextElement, targetRepoOwner, targetRepoName, baseBranch, myRepoOwner, myRepoName, newBranchName, title, body, labels);
+                // 6. Delete the temporary temp.md file
+                const CommitMessage2 = "Delete temp.md";
+                await DeleteFileInBranch(octokit, myRepoOwner, myRepoName, newBranchName, filePath, CommitMessage2);
+            }
+            else {
+                messageTextElement.innerHTML += `<br>[Error]: The current PR already has the <b>translation/done</b> label, which means that there is already a translation PR for it. Please check if you still need to create another translation PR. If yes, you need to change the <b>translation/done</b> label to <b>translation/doing</b> first.<br>`;
+            }
         } catch (error) {
             console.error("An error occurred:", error);
             return error;
@@ -679,4 +683,3 @@
 
     Init();
 })();
-
