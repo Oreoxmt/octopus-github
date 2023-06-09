@@ -369,6 +369,7 @@
             const [sourceTitle, SourceDescription, sourceLabels, BaseRepo, baseBranch, headRepo, headBranch, PRNumber] = await GetPRInfo(octokit, messageTextElement, SourcePRURL);
             const excludeLabels = ["size", "translation", "status", "first-time-contributor", "contribution", "lgtm", "approved"];
             const targetLabels = sourceLabels.filter(label => !excludeLabels.some(excludeLabel => label.includes(excludeLabel)));
+
             if (!sourceLabels.includes("translation/done")) {
                 // Proceed with the PR creation only if the translation/done label is not added for the current source PR
                 //3.Create a new branch in the repository that I forked
