@@ -384,6 +384,7 @@
                 // 5. Create a pull request
                 const title = sourceTitle;
                 const body = UpdatePRDescription(SourcePRURL, SourceDescription, BaseRepo, targetRepoName);
+                targetLabels.push(translationLabel);
                 const labels = targetLabels;
                 const targetPRURL = await CreatePullRequest(octokit, messageTextElement, targetRepoOwner, targetRepoName, baseBranch, myRepoOwner, myRepoName, newBranchName, title, body, labels);
                 // 6. Delete the temporary temp.md file
