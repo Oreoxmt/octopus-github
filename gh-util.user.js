@@ -383,8 +383,7 @@
                 await CreateFileInBranch(octokit, messageTextElement, myRepoOwner, myRepoName, newBranchName, filePath, FileContent, CommitMessage);
                 // 5. Create a pull request
                 const title = sourceTitle;
-                //@const body = UpdatePRDescription(SourcePRURL, SourceDescription, BaseRepo, targetRepoName);
-                const body = "This is test PR.";
+                const body = UpdatePRDescription(SourcePRURL, SourceDescription, BaseRepo, targetRepoName);
                 const labels = targetLabels;
                 const targetPRURL = await CreatePullRequest(octokit, messageTextElement, targetRepoOwner, targetRepoName, baseBranch, myRepoOwner, myRepoName, newBranchName, title, body, labels);
                 // 6. Delete the temporary temp.md file
