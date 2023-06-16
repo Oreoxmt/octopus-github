@@ -90,16 +90,11 @@
     }
 
     // This function can be used to get the PR title, description, label, base, and head information
-    function GetPRInfo(octokit, messageTextElement, URL) {
+    function GetPRInfo(octokit, messageTextElement, repoOwner, repoName, PRNumber) {
         return new Promise((resolve, reject) => {
-            const URLParts = URL.split('/');
-            const sourceRepoOwner = URLParts[3];
-            const sourceRepoName = URLParts[4];
-            const PRNumber = URLParts[6];
-
             octokit.pullRequests.get({
-                owner: sourceRepoOwner,
-                repo: sourceRepoName,
+                owner: repoOwner,
+                repo: repoName,
                 number: PRNumber,
             })
                 .then(response => {
@@ -109,13 +104,13 @@
                 const sourceLabels = PRData.labels.map(label => label.name);
                 const BaseRepo = PRData.base.repo.full_name;
                 const baseBranch = PRData.base.ref;
-                const headRepo = PRData.head.repo.full_name;
+                // const headRepo = PRData.head.repo.full_name;
                 const headBranch = PRData.head.ref;
 
                 messageTextElement.innerHTML += `[Log]: Getting the source language PR information...<br>`;
                 console.log(`Getting source language PR information was successful. The head branch name is: ${headBranch}`);
 
-                const result = [sourceTitle, SourceDescription, sourceLabels, BaseRepo, baseBranch, headRepo, headBranch, PRNumber];
+                const result = [sourceTitle, SourceDescription, sourceLabels, BaseRepo, baseBranch, headBranch];
                 resolve(result);
             })
                 .catch(error => {
@@ -126,11 +121,11 @@
     }
 
     // This function can be used to sync the latest content from the upstream branch to your own branch
-     async function SyncMyRepoBranch(octokit, messageTextElement, targetRepoOwner, targetRepoName, myRepoOwner, myRepoName, baseBranch) {
+     async function SyncMyRepoBranch(octokit, messageTextElement, sourceRepoOwner, sourceRepoName, targetRepoOwner, targetRepoName, baseBranch) {
          try {
              const upstreamRef = await octokit.gitdata.getReference({
-                 owner: targetRepoOwner,
-                 repo: targetRepoName,
+                 owner: sourceRepoOwner,
+                 repo: sourceRepoName,
                  ref: `heads/${baseBranch}`
              });
 
@@ -139,8 +134,8 @@
 
              messageTextElement.innerHTML += `[Log]: Syncing the latest content from the upstream branch...<br>`;
              await octokit.gitdata.updateReference({
-                 owner: myRepoOwner,
-                 repo: myRepoName,
+                 owner: targetRepoOwner,
+                 repo: targetRepoName,
                  ref: `heads/${baseBranch}`,
                  sha: upstreamSHA,
                  force: true,
@@ -148,7 +143,7 @@
              });
              console.log("The content sync is successful!");
          } catch (error) {
-             messageTextElement.innerHTML += `<br>[Error]: Failed to sync the latest content from the upstream branch to your branch. Please check whether you have forked the ${targetRepoOwner}/${targetRepoName} repo with all its branches.<br>`;
+             messageTextElement.innerHTML += `<br>[Error]: Failed to sync the latest content from the upstream branch to your branch. Please check whether you have forked the ${sourceRepoOwner}/${sourceRepoName} repo with all its branches.<br>`;
              console.log(error);
              throw error;
          }
@@ -215,14 +210,14 @@
     }
 
     // This function can be used to modify the description of the translation PR
-    function UpdatePRDescription(SourcePRURL, SourceDescription,BaseRepo, targetRepoName) {
-        const sourcePRCLA = "https://cla-assistant.io/pingcap/" + BaseRepo;
-        const newPRCLA = "https://cla-assistant.io/pingcap/" + targetRepoName;
-        let newPRDescription = SourceDescription.replace(sourcePRCLA, newPRCLA);
+    function UpdatePRDescription(sourcePRURL, sourceDescription, sourceRepo, targetRepo) {
+        const sourcePRCLA = "https://cla-assistant.io/pingcap/" + sourceRepo;
+        const newPRCLA = "https://cla-assistant.io/pingcap/" + targetRepo;
+        let newPRDescription = sourceDescription.replace(sourcePRCLA, newPRCLA);
 
-        newPRDescription = newPRDescription.replace("This PR is translated from:", "This PR is translated from: " + SourcePRURL);
+        newPRDescription = newPRDescription.replace("This PR is translated from:", "This PR is translated from: " + sourcePRURL);
 
-        if (SourceDescription.includes("tips for choosing the affected versions")) {
+        if (sourceDescription.includes("tips for choosing the affected versions")) {
             newPRDescription = newPRDescription.replace(/.*?\[tips for choosing the affected version.*?\n\n?/, "");
         }
 
@@ -230,15 +225,15 @@
     }
 
     // This function can be used to create a pull request based on your specified branch
-    async function CreatePullRequest(octokit, messageTextElement, targetRepoOwner, targetRepoName, baseBranch, myRepoOwner, myRepoName, newBranchName, title, body, labels) {
+    async function CreatePullRequest(octokit, messageTextElement, repoOwner, repoName, baseBranch, headRepoOwner, headBranchName, title, body, labels) {
         try {
             messageTextElement.innerHTML += `[Log]: Creating the empty translation PR...<br>`;
             const prResponse = await octokit.pullRequests.create({
-                owner: targetRepoOwner,
-                repo: targetRepoName,
+                owner: repoOwner,
+                repo: repoName,
                 title: title,
                 body: body,
-                head: `${myRepoOwner}:${newBranchName}`,
+                head: `${headRepoOwner}:${headBranchName}`,
                 base: baseBranch,
                 headers: {'Authorization': `Bearer ${EnsureToken()}`}
             });
@@ -249,13 +244,13 @@
                 //console.log(`Your target PR is created successfully. The PR address is: ${prUrl}`);
                 messageTextElement.innerHTML += `<br> Your target PR is created successfully. <br> The PR address is:<br> <a href="${prUrl}" target="_blank">${prUrl}</a>`;
                 const urlParts = prUrl.split("/");
-                const prNumber = urlParts[6];
+                const targetPRNumber = urlParts[6];
 
                 // Add labels to the created PR
-                const labelsResponse = await octokit.issues.addLabels({
-                    owner: targetRepoOwner,
-                    repo: targetRepoName,
-                    number: prNumber,
+                await octokit.issues.addLabels({
+                    owner: repoOwner,
+                    repo: repoName,
+                    number: targetPRNumber,
                     labels: labels,
                     headers: {'Authorization': `Bearer ${EnsureToken()}`}
                 });
@@ -348,48 +343,63 @@
 
             const octokit = new Octokit({ auth: EnsureToken() });
             console.log(octokit);
+<<<<<<< Updated upstream
             const SourcePRURL = window.location.href;
+=======
+            const currentURL = window.location.pathname;
+            const currentURLSplit = currentURL.split("/");
+            const sourceRepoOwner = currentURLSplit[1];
+>>>>>>> Stashed changes
             const targetRepoOwner = "pingcap";
-
-            let myRepoName, targetRepoName, translationLabel;
-
-            if (SourcePRURL.includes("pingcap/docs-cn/pull")) {
-                myRepoName = "docs";
+            if (sourceRepoOwner != "pingcap") {
+                console.error('Error: The create translation PR feature is only available for pingcap/docs-cn and pingcap/docs.');
+            }
+            if (currentURLSplit[3] != "pull") {
+                console.error('Error: The create translation PR feature is only available for PRs');
+            }
+            const sourcePRNumber = currentURLSplit[4];
+            const sourceRepoName = currentURLSplit[2];
+            let forkRepoName, targetRepoName, translationLabel;
+            if (sourceRepoName == "docs-cn") {
+                forkRepoName = "docs";
                 targetRepoName = "docs";
                 translationLabel = "translation/from-docs-cn";
-            } else if (SourcePRURL.includes("pingcap/docs/pull")) {
+            } else if (sourceRepoName == "docs") {
+                forkRepoName = "docs-cn";
                 targetRepoName = "docs-cn";
-                myRepoName = "docs-cn";
                 translationLabel = "translation/from-docs";
+            } else {
+                console.error('Error: The create translation PR feature is only available for pingcap/docs-cn and pingcap/docs.')
             }
 
             //1.Get the GitHub login name of the current user
             const myRepoOwner = await GetMyGitHubID();
             //2.Get the source PR information
-            const [sourceTitle, SourceDescription, sourceLabels, BaseRepo, baseBranch, headRepo, headBranch, PRNumber] = await GetPRInfo(octokit, messageTextElement, SourcePRURL);
+            const [sourceTitle, SourceDescription, sourceLabels, BaseRepo, baseBranch, headBranch] = await GetPRInfo(octokit, messageTextElement, sourceRepoOwner, sourceRepoName, sourcePRNumber);
             const excludeLabels = ["size", "translation", "status", "first-time-contributor", "contribution", "lgtm", "approved"];
             const targetLabels = sourceLabels.filter(label => !excludeLabels.some(excludeLabel => label.includes(excludeLabel)));
 
             if (!sourceLabels.includes("translation/done")) {
                 // Proceed with the PR creation only if the translation/done label is not added for the current source PR
                 //3.Create a new branch in the repository that I forked
-                await SyncMyRepoBranch(octokit, messageTextElement, targetRepoOwner, targetRepoName, myRepoOwner, myRepoName, baseBranch);
-                const newBranchName = `${headBranch}-${PRNumber}`;
-                await CreateBranch(octokit, messageTextElement, myRepoOwner, myRepoName, newBranchName, baseBranch);
+                await SyncMyRepoBranch(octokit, messageTextElement, targetRepoOwner, targetRepoName, myRepoOwner, forkRepoName, baseBranch);
+                const newBranchName = `${headBranch}-${sourcePRNumber}`;
+                await CreateBranch(octokit, messageTextElement, myRepoOwner, forkRepoName, newBranchName, baseBranch);
                 //4. Create a temporary temp.md file in the new branch
                 const filePath = "temp.md";
                 const FileContent = "This is a test file.";
                 const CommitMessage = "Add temp.md";
-                await CreateFileInBranch(octokit, messageTextElement, myRepoOwner, myRepoName, newBranchName, filePath, FileContent, CommitMessage);
+                await CreateFileInBranch(octokit, messageTextElement, myRepoOwner, forkRepoName, newBranchName, filePath, FileContent, CommitMessage);
                 // 5. Create a pull request
                 const title = sourceTitle;
+                const SourcePRURL = `https://github.com/${sourceRepoOwner}/${sourceRepoName}/pull/${sourcePRNumber}`;
                 const body = UpdatePRDescription(SourcePRURL, SourceDescription, BaseRepo, targetRepoName);
                 targetLabels.push(translationLabel);
                 const labels = targetLabels;
-                const targetPRURL = await CreatePullRequest(octokit, messageTextElement, targetRepoOwner, targetRepoName, baseBranch, myRepoOwner, myRepoName, newBranchName, title, body, labels);
+                await CreatePullRequest(octokit, messageTextElement, targetRepoOwner, targetRepoName, baseBranch, myRepoOwner, newBranchName, title, body, labels);
                 // 6. Delete the temporary temp.md file
                 const CommitMessage2 = "Delete temp.md";
-                await DeleteFileInBranch(octokit, myRepoOwner, myRepoName, newBranchName, filePath, CommitMessage2);
+                await DeleteFileInBranch(octokit, myRepoOwner, forkRepoName, newBranchName, filePath, CommitMessage2);
             }
             else {
                 messageTextElement.innerHTML += `<br>[Error]: The current PR already has the <b>translation/done</b> label, which means that there is already a translation PR for it. Please check if you still need to create another translation PR. If yes, you need to change the <b>translation/done</b> label to <b>translation/doing</b> first.<br>`;
