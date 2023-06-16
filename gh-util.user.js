@@ -348,7 +348,8 @@
 
             const octokit = new Octokit({ auth: EnsureToken() });
             console.log(octokit);
-            const SourcePRURL = window.location.href;
+            const currentURL = window.location.href;
+            const SourcePRURL = currentURL.match(/^https:\/\/github\.com\/.+\/pull\/\d+/)[0];
             const targetRepoOwner = "pingcap";
 
             let myRepoName, targetRepoName, translationLabel;
