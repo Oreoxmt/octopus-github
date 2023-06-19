@@ -90,6 +90,7 @@
     }
 
     // This function can be used to get the PR title, description, label, base, and head information
+    // TODO: Replace the URL parameter with sourceRepoOwner, sourceRepoName, and PRNumber instead of parsing the URL repeatedly in this function
     function GetPRInfo(octokit, messageTextElement, URL) {
         return new Promise((resolve, reject) => {
             const URLParts = URL.split('/');
@@ -348,21 +349,28 @@
 
             const octokit = new Octokit({ auth: EnsureToken() });
             console.log(octokit);
-            const SourcePRURL = window.location.href;
-            const targetRepoOwner = "pingcap";
-
+            // TODO: Define a new function to parse the current URL and return the repo owner, repo name, PR number, etc.
+            const currentURL = window.location.pathname;
+            const currentURLSplit = currentURL.split("/");
+            const currentRepoOwner = currentURLSplit[1];
+            const currentRepoName = currentURLSplit[2];
+            const currentPRNumber = currentURLSplit[4];
+            const targetRepoOwner = "pingcap"
             let myRepoName, targetRepoName, translationLabel;
-
-            if (SourcePRURL.includes("pingcap/docs-cn/pull")) {
-                myRepoName = "docs";
-                targetRepoName = "docs";
-                translationLabel = "translation/from-docs-cn";
-            } else if (SourcePRURL.includes("pingcap/docs/pull")) {
-                targetRepoName = "docs-cn";
-                myRepoName = "docs-cn";
-                translationLabel = "translation/from-docs";
+            switch (currentRepoName) {
+                case "docs-cn":
+                    myRepoName = "docs";
+                    targetRepoName = "docs";
+                    translationLabel = "translation/from-docs-cn";
+                    break;
+                case "docs":
+                    myRepoName = "docs-cn";
+                    targetRepoName = "docs-cn";
+                    translationLabel = "translation/from-docs";
+                    break;
             }
-
+            // TODO: Only concatenate the source PR URL in UpdatePRDescription
+            const SourcePRURL = `https://github.com/${currentRepoOwner}/${currentRepoName}/pull/${currentPRNumber}`;
             //1.Get the GitHub login name of the current user
             const myRepoOwner = await GetMyGitHubID();
             //2.Get the source PR information
