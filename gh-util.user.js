@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Octopus GitHub
-// @version      0.9
+// @version      0.10
 // @description  A userscript for GitHub
 // @author       Oreo
 // @homepage     https://github.com/Oreoxmt/octopus-github
@@ -90,25 +90,19 @@
     }
 
     // This function can be used to get the PR title, description, label, base, and head information
-    // TODO: Replace the URL parameter with sourceRepoOwner, sourceRepoName, and PRNumber instead of parsing the URL repeatedly in this function
-    function GetPRInfo(octokit, messageTextElement, URL) {
+    function GetPRInfo(octokit, messageTextElement, RepoOwner, RepoName, PRNumber) {
         return new Promise((resolve, reject) => {
-            const URLParts = URL.split('/');
-            const sourceRepoOwner = URLParts[3];
-            const sourceRepoName = URLParts[4];
-            const PRNumber = URLParts[6];
-
             octokit.pullRequests.get({
-                owner: sourceRepoOwner,
-                repo: sourceRepoName,
+                owner: RepoOwner,
+                repo: RepoName,
                 number: PRNumber,
             })
                 .then(response => {
                 const PRData = response.data;
                 const sourceTitle = PRData.title;
-                const SourceDescription = PRData.body;
+                const sourceDescription = PRData.body;
                 const sourceLabels = PRData.labels.map(label => label.name);
-                const BaseRepo = PRData.base.repo.full_name;
+                const baseRepo = PRData.base.repo.full_name;
                 const baseBranch = PRData.base.ref;
                 const headRepo = PRData.head.repo.full_name;
                 const headBranch = PRData.head.ref;
@@ -116,7 +110,7 @@
                 messageTextElement.innerHTML += `[Log]: Getting the source language PR information...<br>`;
                 console.log(`Getting source language PR information was successful. The head branch name is: ${headBranch}`);
 
-                const result = [sourceTitle, SourceDescription, sourceLabels, BaseRepo, baseBranch, headRepo, headBranch, PRNumber];
+                const result = [sourceTitle, sourceDescription, sourceLabels, baseRepo, baseBranch, headRepo, headBranch];
                 resolve(result);
             })
                 .catch(error => {
@@ -127,33 +121,42 @@
     }
 
     // This function can be used to sync the latest content from the upstream branch to your own branch
-     async function SyncMyRepoBranch(octokit, messageTextElement, targetRepoOwner, targetRepoName, myRepoOwner, myRepoName, baseBranch) {
-         try {
-             const upstreamRef = await octokit.gitdata.getReference({
-                 owner: targetRepoOwner,
-                 repo: targetRepoName,
-                 ref: `heads/${baseBranch}`
-             });
+    async function SyncMyRepoBranch(octokit, messageTextElement, targetRepoOwner, targetRepoName, myRepoOwner, myRepoName, baseBranch) {
+        try {
+            const upstreamRef = await octokit.gitdata.getReference({
+                owner: targetRepoOwner,
+                repo: targetRepoName,
+                ref: `heads/${baseBranch}`
+            });
 
-             const upstreamSHA = upstreamRef.data.object.sha;
-             console.log(upstreamSHA);
+            const upstreamSHA = upstreamRef.data.object.sha;
+            console.log(upstreamSHA);
 
-             messageTextElement.innerHTML += `[Log]: Syncing the latest content from the upstream branch...<br>`;
-             await octokit.gitdata.updateReference({
-                 owner: myRepoOwner,
-                 repo: myRepoName,
-                 ref: `heads/${baseBranch}`,
-                 sha: upstreamSHA,
-                 force: true,
-                 headers: {'Authorization': `Bearer ${EnsureToken()}`}
-             });
-             console.log("The content sync is successful!");
-         } catch (error) {
-             messageTextElement.innerHTML += `<br>[Error]: Failed to sync the latest content from the upstream branch to your branch. Please check whether you have forked the ${targetRepoOwner}/${targetRepoName} repo with all its branches.<br>`;
-             console.log(error);
-             throw error;
-         }
-    };
+            messageTextElement.innerHTML += `[Log]: Syncing the latest content from the upstream branch...<br>`;
+            await octokit.gitdata.updateReference({
+                owner: myRepoOwner,
+                repo: myRepoName,
+                ref: `heads/${baseBranch}`,
+                sha: upstreamSHA,
+                force: true,
+                headers: { 'Authorization': `Bearer ${EnsureToken()}` }
+            });
+            console.log("The content sync is successful!");
+        } catch (error) {
+            const myRepoUrl = `https://github.com/${myRepoOwner}/${myRepoName}`;
+            const myBranchesUrl = `${myRepoUrl}/branches`;
+            const baseBranchUrl = `${myRepoUrl}/tree/${baseBranch}`;
+            const myRepoResponse = await fetch(myRepoUrl, { method: 'HEAD' });
+            if (myRepoResponse.ok) {
+                const baseBranchResponse = await fetch(baseBranchUrl, { method: 'HEAD' });
+                messageTextElement.innerHTML += baseBranchResponse.ok ? `<br>[Error]: Failed to sync the <a href="${baseBranchUrl}" target="_blank">${baseBranch}</a> branch of your forked <a href="${myRepoUrl}" target="_blank">${myRepoOwner}</a> repo. <br> You need to manually sync your <a href="${baseBranchUrl}" target="_blank">${baseBranch}</a> branch from the upstream branch first.<br>` : `<br>[Error]: Your forked <a href="${myRepoUrl}" target="_blank">${myRepoName}</a> repo does not have the ${baseBranch} branch yet. <br> You need to manually <a href="${myBranchesUrl}" target="_blank">create the ${baseBranch} branch</a> in your repo based on the upstream.<br>`;
+            } else {
+                messageTextElement.innerHTML += `<br>[Error]: Failed to sync the latest content from the upstream branch to your branch. Please check whether you have forked the <a href="https://github.com/${targetRepoOwner}/${targetRepoName}" target="_blank">${targetRepoOwner}/${targetRepoName}</a> repo. If not, you need to fork the <a href="https://github.com/${targetRepoOwner}/${targetRepoName}" target="_blank">${targetRepoOwner}/${targetRepoName}</a> repo with all its branches first.<br>`;
+            }
+            console.log(error);
+            throw error;
+        }
+    }
 
     // This function can be used to create a new branch in your repo
     async function CreateBranch(octokit, messageTextElement, repoOwner, repoName, branchName, baseBranch) {
@@ -216,14 +219,15 @@
     }
 
     // This function can be used to modify the description of the translation PR
-    function UpdatePRDescription(SourcePRURL, SourceDescription,BaseRepo, targetRepoName) {
-        const sourcePRCLA = "https://cla-assistant.io/pingcap/" + BaseRepo;
+    function UpdatePRDescription(sourceRepoOwner, sourceRepoName, sourcePRNumber, sourceDescription, baseRepo, targetRepoName) {
+        const sourcePRCLA = "https://cla-assistant.io/pingcap/" + baseRepo;
         const newPRCLA = "https://cla-assistant.io/pingcap/" + targetRepoName;
-        let newPRDescription = SourceDescription.replace(sourcePRCLA, newPRCLA);
+        const sourcePRURL = `https://github.com/${sourceRepoOwner}/${sourceRepoName}/pull/${sourcePRNumber}`;
+        let newPRDescription = sourceDescription.replace(sourcePRCLA, newPRCLA);
 
-        newPRDescription = newPRDescription.replace("This PR is translated from:", "This PR is translated from: " + SourcePRURL);
+        newPRDescription = newPRDescription.replace("This PR is translated from:", "This PR is translated from: " + sourcePRURL);
 
-        if (SourceDescription.includes("tips for choosing the affected versions")) {
+        if (sourceDescription.includes("tips for choosing the affected versions")) {
             newPRDescription = newPRDescription.replace(/.*?\[tips for choosing the affected version.*?\n\n?/, "");
         }
 
@@ -369,33 +373,33 @@
                     translationLabel = "translation/from-docs";
                     break;
             }
-            // TODO: Only concatenate the source PR URL in UpdatePRDescription
-            const SourcePRURL = `https://github.com/${currentRepoOwner}/${currentRepoName}/pull/${currentPRNumber}`;
+            
             //1.Get the GitHub login name of the current user
             const myRepoOwner = await GetMyGitHubID();
             //2.Get the source PR information
-            const [sourceTitle, SourceDescription, sourceLabels, BaseRepo, baseBranch, headRepo, headBranch, PRNumber] = await GetPRInfo(octokit, messageTextElement, SourcePRURL);
+            const [sourceTitle, sourceDescription, sourceLabels, baseRepo, baseBranch, headRepo, headBranch] = await GetPRInfo(octokit, messageTextElement, currentRepoOwner, currentRepoName, currentPRNumber);
             const excludeLabels = ["size", "translation", "status", "first-time-contributor", "contribution", "lgtm", "approved"];
             const targetLabels = sourceLabels.filter(label => !excludeLabels.some(excludeLabel => label.includes(excludeLabel)));
 
             if (!sourceLabels.includes("translation/done")) {
                 // Proceed with the PR creation only if the translation/done label is not added for the current source PR
-                //3.Create a new branch in the repository that I forked
+                //3. Sync the base branch of my forked repository
                 await SyncMyRepoBranch(octokit, messageTextElement, targetRepoOwner, targetRepoName, myRepoOwner, myRepoName, baseBranch);
-                const newBranchName = `${headBranch}-${PRNumber}`;
+                //4. Create a new branch in the repository that I forked
+                const newBranchName = `${headBranch}-${currentPRNumber}`;
                 await CreateBranch(octokit, messageTextElement, myRepoOwner, myRepoName, newBranchName, baseBranch);
-                //4. Create a temporary temp.md file in the new branch
+                //5. Create a temporary temp.md file in the new branch
                 const filePath = "temp.md";
                 const FileContent = "This is a test file.";
                 const CommitMessage = "Add temp.md";
                 await CreateFileInBranch(octokit, messageTextElement, myRepoOwner, myRepoName, newBranchName, filePath, FileContent, CommitMessage);
-                // 5. Create a pull request
+                //6. Create a pull request
                 const title = sourceTitle;
-                const body = UpdatePRDescription(SourcePRURL, SourceDescription, BaseRepo, targetRepoName);
+                const body = UpdatePRDescription(currentRepoOwner, currentRepoName, currentPRNumber, sourceDescription, baseRepo, targetRepoName);
                 targetLabels.push(translationLabel);
                 const labels = targetLabels;
                 const targetPRURL = await CreatePullRequest(octokit, messageTextElement, targetRepoOwner, targetRepoName, baseBranch, myRepoOwner, myRepoName, newBranchName, title, body, labels);
-                // 6. Delete the temporary temp.md file
+                //7. Delete the temporary temp.md file
                 const CommitMessage2 = "Delete temp.md";
                 await DeleteFileInBranch(octokit, myRepoOwner, myRepoName, newBranchName, filePath, CommitMessage2);
             }
