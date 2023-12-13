@@ -219,17 +219,16 @@
     }
 
     // This function can be used to modify the description of the translation PR
-    function UpdatePRDescription(sourceRepoOwner, sourceRepoName, sourcePRNumber, sourceDescription, baseRepo, targetRepoName) {
-        const sourcePRCLA = "https://cla-assistant.io/pingcap/" + baseRepo;
+    function UpdatePRDescription(sourceRepoOwner, sourceRepoName, sourcePRNumber, sourceDescription, targetRepoName) {
+        const sourcePRCLA = "https://cla-assistant.io/pingcap/" + sourceRepoName;
         const newPRCLA = "https://cla-assistant.io/pingcap/" + targetRepoName;
         const sourcePRURL = `https://github.com/${sourceRepoOwner}/${sourceRepoName}/pull/${sourcePRNumber}`;
         let newPRDescription = sourceDescription.replace(sourcePRCLA, newPRCLA);
 
         newPRDescription = newPRDescription.replace("This PR is translated from:", "This PR is translated from: " + sourcePRURL);
-
-        if (sourceDescription.includes("tips for choosing the affected versions")) {
-            newPRDescription = newPRDescription.replace(/.*?\[tips for choosing the affected version.*?\n\n?/, "");
-        }
+        const regexConstructor = new RegExp(".*?\\[tips for choosing the affected versions.*?\\n\\n?", "g");
+        newPRDescription = newPRDescription.replace(regexConstructor, "");
+        console.log(newPRDescription)
 
         return newPRDescription;
     }
@@ -395,7 +394,7 @@
                 await CreateFileInBranch(octokit, messageTextElement, myRepoOwner, myRepoName, newBranchName, filePath, FileContent, CommitMessage);
                 //6. Create a pull request
                 const title = sourceTitle;
-                const body = UpdatePRDescription(currentRepoOwner, currentRepoName, currentPRNumber, sourceDescription, baseRepo, targetRepoName);
+                const body = UpdatePRDescription(currentRepoOwner, currentRepoName, currentPRNumber, sourceDescription, targetRepoName);
                 targetLabels.push(translationLabel);
                 const labels = targetLabels;
                 const targetPRURL = await CreatePullRequest(octokit, messageTextElement, targetRepoOwner, targetRepoName, baseBranch, myRepoOwner, myRepoName, newBranchName, title, body, labels);
