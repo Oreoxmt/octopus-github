@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Octopus GitHub
-// @version      0.70
+// @version      0.60
 // @description  A userscript for GitHub
 // @author       Oreo
 // @homepage     https://github.com/Oreoxmt/octopus-github
@@ -418,7 +418,7 @@
             return;
         }
         // First, find the "table-list-header-toggle" div
-        var toggleDiv = document.querySelector('.table-list-header-toggle.no-wrap');
+        var toggleDiv = document.querySelector('.table-list-header-toggle.float-right');
 
         if (!toggleDiv) {
             return;
