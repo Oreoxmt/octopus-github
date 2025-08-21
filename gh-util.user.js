@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Octopus GitHub
-// @version      0.60
+// @version      0.80
 // @description  A userscript for GitHub
 // @author       Oreo
 // @homepage     https://github.com/Oreoxmt/octopus-github
@@ -372,7 +372,7 @@
                     translationLabel = "translation/from-docs";
                     break;
             }
-            
+
             //1.Get the GitHub login name of the current user
             const myRepoOwner = await GetMyGitHubID();
             //2.Get the source PR information
