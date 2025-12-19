@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Octopus GitHub
-// @version      0.80
+// @version      0.90
 // @description  A userscript for GitHub
 // @author       Oreo
 // @homepage     https://github.com/Oreoxmt/octopus-github
@@ -19,6 +19,7 @@
 
     const ATTR = 'octopus-github-util-mark'
     const STORAGEKEY = 'octopus-github-util:token'
+    const TARGET_REPO_OWNER = 'pingcap'
 
     function GetRepositoryInformation() {
         // Get the pathname of the current page
@@ -96,6 +97,7 @@
                 owner: RepoOwner,
                 repo: RepoName,
                 number: PRNumber,
+                headers: {'Authorization': `Bearer ${EnsureToken()}`}
             })
                 .then(response => {
                 const PRData = response.data;
@@ -126,7 +128,8 @@
             const upstreamRef = await octokit.gitdata.getReference({
                 owner: targetRepoOwner,
                 repo: targetRepoName,
-                ref: `heads/${baseBranch}`
+                ref: `heads/${baseBranch}`,
+                headers: {'Authorization': `Bearer ${EnsureToken()}`}
             });
 
             const upstreamSHA = upstreamRef.data.object.sha;
@@ -164,7 +167,8 @@
             const baseRef = await octokit.gitdata.getReference({
                 owner: repoOwner,
                 repo: repoName,
-                ref: `heads/${baseBranch}`
+                ref: `heads/${baseBranch}`,
+                headers: {'Authorization': `Bearer ${EnsureToken()}`}
             });
 
             const baseSha = baseRef.data.object.sha;
@@ -226,7 +230,7 @@
         let newPRDescription = sourceDescription.replace(sourcePRCLA, newPRCLA);
 
         newPRDescription = newPRDescription.replace("This PR is translated from:", "This PR is translated from: " + sourcePRURL);
-        const regexConstructor = new RegExp(".*?\\[tips for choosing the affected versions.*?\\n\\n?", "g");
+        const regexConstructor = new RegExp(".*?\\tips for choosing the affected versions.*?\\n\\n?", "g");
         newPRDescription = newPRDescription.replace(regexConstructor, "");
         console.log(newPRDescription)
 
@@ -251,7 +255,7 @@
                 console.log(prResponse);
                 const prUrl = prResponse.data.html_url;
                 //console.log(`Your target PR is created successfully. The PR address is: ${prUrl}`);
-                messageTextElement.innerHTML += `<br> Your target PR is created successfully. <br> The PR address is:<br> <a href="${prUrl}" target="_blank">${prUrl}</a>`;
+                messageTextElement.innerHTML += `<br> Your target PR is created successfully. <br> The PR address is:<br> <a href="${prUrl}" target="_blank">${prUrl}</a> <br>`;
                 const urlParts = prUrl.split("/");
                 const prNumber = urlParts[6];
 
@@ -285,7 +289,8 @@
                 owner: repoOwner,
                 repo: repoName,
                 path: filePath,
-                ref: branchName
+                ref: branchName,
+                headers: {'Authorization': `Bearer ${EnsureToken()}`}
             });
 
             await octokit.repos.deleteFile({
@@ -305,7 +310,117 @@
         }
     }
 
-    async function CreateTransPR() {
+    // This function can be used to check if the current user has write permission to the target repository
+    async function CheckRepositoryWritePermission(targetRepoOwner, targetRepoName) {
+        try {
+            const repoUrl = `https://api.github.com/repos/${targetRepoOwner}/${targetRepoName}`;
+            const response = await fetch(repoUrl, {
+                headers: {
+                    'Authorization': `Bearer ${EnsureToken()}`,
+                    'Accept': 'application/vnd.github+json'
+                }
+            });
+
+            if (response.ok) {
+                const repoData = await response.json();
+                // Check if user has write permission (push access)
+                return repoData.permissions && (repoData.permissions.push || repoData.permissions.admin);
+            }
+            return false;
+        } catch (error) {
+            console.error('Failed to check repository permissions:', error);
+            return false;
+        }
+    }
+
+    // This function can be used to trigger a workflow in the forked repository
+    async function TriggerWorkflow(octokit, messageTextElement, targetRepoOwner, targetRepoName, baseBranch, sourcePRURL, targetPRURL) {
+        try {
+            // Check if user has write permission to the forked repository
+            const hasWritePermission = await CheckRepositoryWritePermission(targetRepoOwner, targetRepoName);
+
+            if (!hasWritePermission) {
+                messageTextElement.innerHTML += `<br>[Error]: You don't have write permission for the repository ${targetRepoOwner}/${targetRepoName}, so the translation workflow cannot be triggered automatically.<br>`;
+                messageTextElement.innerHTML += `[Info]: Please check your repository permissions and ensure the workflow file exists in that repository.<br>`;
+                return;
+            }
+
+            let workflowFileName;
+
+            // Determine which workflow to trigger based on the target repository name
+            if (targetRepoName === "docs") {
+                workflowFileName = "sync-doc-pr-zh-to-en.yml";
+            } else if (targetRepoName === "docs-cn") {
+                workflowFileName = "sync-doc-pr-en-to-zh.yml";
+            } else {
+                console.log(`No workflow configured for repository: ${targetRepoName}`);
+                return;
+            }
+
+            messageTextElement.innerHTML += `<br> [Log]: Triggering workflow ${workflowFileName} in ${targetRepoOwner}/${targetRepoName} to translate the current PR...<br>`;
+
+            const workflowDispatchUrl = `https://api.github.com/repos/${targetRepoOwner}/${targetRepoName}/actions/workflows/${workflowFileName}/dispatches`;
+
+            const requestBody = {
+                ref: baseBranch,
+                inputs: {
+                    source_pr_url: sourcePRURL,
+                    target_pr_url: targetPRURL,
+                    ai_provider: 'gemini'
+                }
+            };
+
+            console.log(`Triggering workflow with URL: ${workflowDispatchUrl}`);
+            console.log(`Request body:`, requestBody);
+
+            const response = await fetch(workflowDispatchUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${EnsureToken()}`,
+                    'Accept': 'application/vnd.github+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            console.log(`Response status: ${response.status} ${response.statusText}`);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.log(`Response error text:`, errorText);
+                
+                // Provide helpful error message for common issues
+                if (response.status === 422) {
+                    messageTextElement.innerHTML += `<br>[Error]: Failed to trigger workflow in ${targetRepoOwner}/${targetRepoName}.<br>`;
+                    messageTextElement.innerHTML += `[Info]: The workflow file <code>${workflowFileName}</code> may not exist in the repository or it doesn't have the <code>workflow_dispatch</code> trigger configured.<br>`;
+                    messageTextElement.innerHTML += `[Info]: Please ensure:<br>`;
+                    messageTextElement.innerHTML += `1. The repository <a href="https://github.com/${targetRepoOwner}/${targetRepoName}" target="_blank">${targetRepoOwner}/${targetRepoName}</a> has the workflow file <code>.github/workflows/${workflowFileName}</code><br>`;
+                    messageTextElement.innerHTML += `2. The workflow file contains <code>workflow_dispatch:</code> in the <code>on:</code> section<br>`;
+                    messageTextElement.innerHTML += `3. GitHub Actions is enabled in the repository settings<br>`;
+                    return;
+                }
+                
+                throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
+            }
+
+            messageTextElement.innerHTML += `[Log]: Workflow ${workflowFileName} triggered successfully!<br>`;
+            //messageTextElement.innerHTML += `[Log]: Source PR: ${sourcePRURL}<br>`;
+            //messageTextElement.innerHTML += `[Log]: Target PR: ${targetPRURL}<br>`;
+
+            // Provide direct link to the workflow page where user can check the status
+            const workflowPageUrl = `https://github.com/${targetRepoOwner}/${targetRepoName}/actions/workflows/${workflowFileName}`;
+            messageTextElement.innerHTML += `[Log]: Check workflow status at: <a href="${workflowPageUrl}" target="_blank">${workflowPageUrl}</a><br>`;
+            messageTextElement.innerHTML += `[Info]: To monitor the translation progress, check the preceding workflow page. After the workflow completes successfully, the translation result will be automatically applied to the target PR.<br>`;
+
+            console.log(`Workflow ${workflowFileName} triggered successfully in ${targetRepoOwner}/${targetRepoName}`);
+
+        } catch (error) {
+            messageTextElement.innerHTML += `<br>[Error]: Failed to trigger workflow: ${error.message}<br>`;
+            console.error(`Failed to trigger workflow:`, error);
+        }
+    }
+
+    async function CreateTransPR(triggerWorkflow = true) {
         try {
             const messageBox = document.createElement("div");
             messageBox.style.position = "fixed";
@@ -318,8 +433,10 @@
             messageBox.style.borderRadius = "6px";
             messageBox.style.boxShadow = "0 0 10px rgba(0, 0, 0, 0.1)";
             messageBox.style.zIndex = "9999";
-            messageBox.style.width = "430px";
-            messageBox.style.height = "300px";
+            messageBox.style.width = "480px";
+            messageBox.style.minHeight = "300px";
+            messageBox.style.maxHeight = "80vh";
+            messageBox.style.overflow = "auto";
             messageBox.style.marginTop = "10px";
             document.body.appendChild(messageBox);
 
@@ -358,7 +475,7 @@
             const currentRepoOwner = currentURLSplit[1];
             const currentRepoName = currentURLSplit[2];
             const currentPRNumber = currentURLSplit[4];
-            const targetRepoOwner = "pingcap"
+            const targetRepoOwner = TARGET_REPO_OWNER
             let myRepoName, targetRepoName, translationLabel;
             switch (currentRepoName) {
                 case "docs-cn":
@@ -401,6 +518,13 @@
                 //7. Delete the temporary temp.md file
                 const CommitMessage2 = "Delete temp.md";
                 await DeleteFileInBranch(octokit, myRepoOwner, myRepoName, newBranchName, filePath, CommitMessage2);
+                //8. Trigger the workflow in the forked repository (only if triggerWorkflow is true)
+                if (triggerWorkflow) {
+                    const sourcePRURL = `https://github.com/${currentRepoOwner}/${currentRepoName}/pull/${currentPRNumber}`;
+                    await TriggerWorkflow(octokit, messageTextElement, myRepoOwner, myRepoName, baseBranch, sourcePRURL, targetPRURL);
+                } else {
+                    messageTextElement.innerHTML += `<br>[Info]: Translation PR created successfully without triggering the workflow.<br>`;
+                }
             }
             else {
                 messageTextElement.innerHTML += `<br>[Error]: The current PR already has the <b>translation/done</b> label, which means that there is already a translation PR for it. Please check if you still need to create another translation PR. If yes, you need to change the <b>translation/done</b> label to <b>translation/doing</b> first.<br>`;
@@ -623,7 +747,7 @@
         const MARK = 'create-trans-pr-button';
 
         // Check if the button already exists
-        if (document.querySelector(`button[${ATTR}="${MARK}"]`)) {
+        if (document.querySelector(`div[${ATTR}="${MARK}"]`)) {
           return;
         }
 
@@ -634,22 +758,105 @@
           return;
         }
 
-        // Create a button element
+        // Create a container for the dropdown
+        var dropdownContainer = document.createElement("div");
+        dropdownContainer.setAttribute("class", "flex-md-order-2 position-relative");
+        dropdownContainer.setAttribute(ATTR, MARK);
+        dropdownContainer.style.display = "inline-block";
+
+        // Create the main button
         var button = document.createElement("button");
-        button.innerHTML = "Create Translation PR";
+        button.innerHTML = 'Create Translation PR <span class="Button-visual Button-trailingAction" style="margin-left: 4px;"><svg aria-hidden="true" height="16" viewBox="0 0 16 16" version="1.1" width="16" data-view-component="true" class="octicon octicon-triangle-down"><path d="m4.427 7.427 3.396 3.396a.25.25 0 0 0 .354 0l3.396-3.396A.25.25 0 0 0 11.396 7H4.604a.25.25 0 0 0-.177.427Z"></path></svg></span>';
         button.setAttribute(
           "class",
-          "flex-md-order-2 Button--secondary Button--small Button m-0 mr-md-0"
+          "Button--secondary Button--small Button m-0"
         );
-        button.setAttribute(ATTR, MARK);
-        headerActions.appendChild(button);
+        button.style.cursor = "pointer";
 
-        // Add event listener to the button
-        button.addEventListener("click", function () {
-          // Call the function to create translation PR
-          EnsureToken();
-          CreateTransPR();
+        // Create the dropdown menu
+        var dropdownMenu = document.createElement("div");
+        dropdownMenu.style.display = "none";
+        dropdownMenu.style.position = "absolute";
+        dropdownMenu.style.right = "0";
+        dropdownMenu.style.top = "100%";
+        dropdownMenu.style.marginTop = "4px";
+        dropdownMenu.style.backgroundColor = "white";
+        dropdownMenu.style.border = "1px solid #d0d7de";
+        dropdownMenu.style.borderRadius = "6px";
+        dropdownMenu.style.boxShadow = "0 8px 24px rgba(140,149,159,0.2)";
+        dropdownMenu.style.zIndex = "1000";
+        dropdownMenu.style.minWidth = "200px";
+        dropdownMenu.style.padding = "4px 0";
+
+        // Create first option: Create Synced Translation PR
+        var syncedOption = document.createElement("div");
+        syncedOption.innerHTML = "Create Synced Translation PR";
+        syncedOption.style.padding = "8px 16px";
+        syncedOption.style.cursor = "pointer";
+        syncedOption.style.fontSize = "14px";
+        syncedOption.style.color = "#24292e";
+        syncedOption.style.whiteSpace = "nowrap";
+        syncedOption.addEventListener("mouseenter", function() {
+          syncedOption.style.backgroundColor = "#f6f8fa";
         });
+        syncedOption.addEventListener("mouseleave", function() {
+          syncedOption.style.backgroundColor = "white";
+        });
+        syncedOption.addEventListener("click", function(e) {
+          e.stopPropagation();
+          dropdownMenu.style.display = "none";
+          EnsureToken();
+          CreateTransPR(true); // Create PR and trigger workflow
+        });
+
+        // Create second option: Create Empty Translation PR
+        var emptyOption = document.createElement("div");
+        emptyOption.innerHTML = "Create Empty Translation PR";
+        emptyOption.style.padding = "8px 16px";
+        emptyOption.style.cursor = "pointer";
+        emptyOption.style.fontSize = "14px";
+        emptyOption.style.color = "#24292e";
+        emptyOption.style.whiteSpace = "nowrap";
+        emptyOption.addEventListener("mouseenter", function() {
+          emptyOption.style.backgroundColor = "#f6f8fa";
+        });
+        emptyOption.addEventListener("mouseleave", function() {
+          emptyOption.style.backgroundColor = "white";
+        });
+        emptyOption.addEventListener("click", function(e) {
+          e.stopPropagation();
+          dropdownMenu.style.display = "none";
+          EnsureToken();
+          CreateTransPR(false); // Create PR without triggering workflow
+        });
+
+        // Append options to dropdown menu
+        dropdownMenu.appendChild(syncedOption);
+        dropdownMenu.appendChild(emptyOption);
+
+        // Toggle dropdown menu on button click
+        button.addEventListener("click", function(e) {
+          e.stopPropagation();
+          if (dropdownMenu.style.display === "none") {
+            dropdownMenu.style.display = "block";
+          } else {
+            dropdownMenu.style.display = "none";
+          }
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener("click", function(e) {
+          if (!dropdownContainer.contains(e.target)) {
+            dropdownMenu.style.display = "none";
+          }
+        });
+
+        // Append button and dropdown to container
+        dropdownContainer.appendChild(button);
+        dropdownContainer.appendChild(dropdownMenu);
+
+        // Append container to header actions
+        headerActions.appendChild(dropdownContainer);
       }
 
     function Init() {
@@ -682,7 +889,7 @@
             observer.observe(targetNode, observerOptions);
 
             // If we are on the PR details page of pingcap/docs-cn or pingcap/docs, add the CreateTranslationPR button
-            if (url.includes('pingcap/docs-cn/pull') || url.includes('pingcap/docs/pull')) {
+            if (url.includes(`${TARGET_REPO_OWNER}/docs-cn/pull`) || url.includes(`${TARGET_REPO_OWNER}/docs/pull`)) {
                 EnsureCreateTransPRButtonOnPR();
                 const observerCreateTransPR = new MutationObserver(() => {
                     EnsureCreateTransPRButtonOnPR();
