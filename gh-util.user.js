@@ -229,7 +229,11 @@
         const sourcePRURL = `https://github.com/${sourceRepoOwner}/${sourceRepoName}/pull/${sourcePRNumber}`;
         let newPRDescription = sourceDescription.replace(sourcePRCLA, newPRCLA);
 
-        newPRDescription = newPRDescription.replace("This PR is translated from:", "This PR is translated from: " + sourcePRURL);
+        if (newPRDescription.includes("This PR is translated from:")) {
+            newPRDescription = newPRDescription.replace("This PR is translated from:", "This PR is translated from: " + sourcePRURL);
+        } else {
+            newPRDescription = "This PR is translated from: " + sourcePRURL + "\n\n" + newPRDescription;
+        }
         const regexConstructor = new RegExp(".*?\\tips for choosing the affected versions.*?\\n\\n?", "g");
         newPRDescription = newPRDescription.replace(regexConstructor, "");
         console.log(newPRDescription)
