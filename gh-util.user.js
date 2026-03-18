@@ -311,9 +311,9 @@
     }
 
     // This function can be used to check if the current user has write permission to the target repository
-    async function CheckRepositoryWritePermission(targetRepoOwner, targetRepoName) {
+    async function CheckRepositoryWritePermission(repoOwner, repoName) {
         try {
-            const repoUrl = `https://api.github.com/repos/${targetRepoOwner}/${targetRepoName}`;
+            const repoUrl = `https://api.github.com/repos/${repoOwner}/${repoName}`;
             const response = await fetch(repoUrl, {
                 headers: {
                     'Authorization': `Bearer ${EnsureToken()}`,
@@ -333,14 +333,14 @@
         }
     }
 
-    // This function can be used to trigger a workflow in the forked repository
-    async function TriggerWorkflow(octokit, messageTextElement, targetRepoOwner, targetRepoName, baseBranch, sourcePRURL, targetPRURL) {
+    // This function can be used to trigger a workflow in the repository where the empty PR was created
+    async function TriggerWorkflow(octokit, messageTextElement, workflowRepoOwner, workflowRepoName, baseBranch, sourcePRURL, targetPRURL) {
         try {
-            // Check if user has write permission to the forked repository
-            const hasWritePermission = await CheckRepositoryWritePermission(targetRepoOwner, targetRepoName);
+            // Check if user has write permission to the repository where the empty PR was created
+            const hasWritePermission = await CheckRepositoryWritePermission(workflowRepoOwner, workflowRepoName);
 
             if (!hasWritePermission) {
-                messageTextElement.innerHTML += `<br>[Error]: You don't have write permission for the repository ${targetRepoOwner}/${targetRepoName}, so the translation workflow cannot be triggered automatically.<br>`;
+                messageTextElement.innerHTML += `<br>[Error]: You don't have write permission for the repository ${workflowRepoOwner}/${workflowRepoName}, so the translation workflow cannot be triggered automatically.<br>`;
                 messageTextElement.innerHTML += `[Info]: Please check your repository permissions and ensure the workflow file exists in that repository.<br>`;
                 return;
             }
@@ -348,18 +348,18 @@
             let workflowFileName;
 
             // Determine which workflow to trigger based on the target repository name
-            if (targetRepoName === "docs") {
+            if (workflowRepoName === "docs") {
                 workflowFileName = "sync-doc-pr-zh-to-en.yml";
-            } else if (targetRepoName === "docs-cn") {
+            } else if (workflowRepoName === "docs-cn") {
                 workflowFileName = "sync-doc-pr-en-to-zh.yml";
             } else {
-                console.log(`No workflow configured for repository: ${targetRepoName}`);
+                console.log(`No workflow configured for repository: ${workflowRepoName}`);
                 return;
             }
 
-            messageTextElement.innerHTML += `<br> [Log]: Triggering workflow ${workflowFileName} in ${targetRepoOwner}/${targetRepoName} to translate the current PR...<br>`;
+            messageTextElement.innerHTML += `<br> [Log]: Triggering workflow ${workflowFileName} in ${workflowRepoOwner}/${workflowRepoName} to translate the current PR...<br>`;
 
-            const workflowDispatchUrl = `https://api.github.com/repos/${targetRepoOwner}/${targetRepoName}/actions/workflows/${workflowFileName}/dispatches`;
+            const workflowDispatchUrl = `https://api.github.com/repos/${workflowRepoOwner}/${workflowRepoName}/actions/workflows/${workflowFileName}/dispatches`;
 
             const requestBody = {
                 ref: baseBranch,
@@ -391,10 +391,10 @@
                 
                 // Provide helpful error message for common issues
                 if (response.status === 422) {
-                    messageTextElement.innerHTML += `<br>[Error]: Failed to trigger workflow in ${targetRepoOwner}/${targetRepoName}.<br>`;
+                    messageTextElement.innerHTML += `<br>[Error]: Failed to trigger workflow in ${workflowRepoOwner}/${workflowRepoName}.<br>`;
                     messageTextElement.innerHTML += `[Info]: The workflow file <code>${workflowFileName}</code> may not exist in the repository or it doesn't have the <code>workflow_dispatch</code> trigger configured.<br>`;
                     messageTextElement.innerHTML += `[Info]: Please ensure:<br>`;
-                    messageTextElement.innerHTML += `1. The repository <a href="https://github.com/${targetRepoOwner}/${targetRepoName}" target="_blank">${targetRepoOwner}/${targetRepoName}</a> has the workflow file <code>.github/workflows/${workflowFileName}</code><br>`;
+                    messageTextElement.innerHTML += `1. The repository <a href="https://github.com/${workflowRepoOwner}/${workflowRepoName}" target="_blank">${workflowRepoOwner}/${workflowRepoName}</a> has the workflow file <code>.github/workflows/${workflowFileName}</code><br>`;
                     messageTextElement.innerHTML += `2. The workflow file contains <code>workflow_dispatch:</code> in the <code>on:</code> section<br>`;
                     messageTextElement.innerHTML += `3. GitHub Actions is enabled in the repository settings<br>`;
                     return;
@@ -408,11 +408,11 @@
             //messageTextElement.innerHTML += `[Log]: Target PR: ${targetPRURL}<br>`;
 
             // Provide direct link to the workflow page where user can check the status
-            const workflowPageUrl = `https://github.com/${targetRepoOwner}/${targetRepoName}/actions/workflows/${workflowFileName}`;
+            const workflowPageUrl = `https://github.com/${workflowRepoOwner}/${workflowRepoName}/actions/workflows/${workflowFileName}`;
             messageTextElement.innerHTML += `[Log]: Check workflow status at: <a href="${workflowPageUrl}" target="_blank">${workflowPageUrl}</a><br>`;
             messageTextElement.innerHTML += `[Info]: To monitor the translation progress, check the preceding workflow page. After the workflow completes successfully, the translation result will be automatically applied to the target PR.<br>`;
 
-            console.log(`Workflow ${workflowFileName} triggered successfully in ${targetRepoOwner}/${targetRepoName}`);
+            console.log(`Workflow ${workflowFileName} triggered successfully in ${workflowRepoOwner}/${workflowRepoName}`);
 
         } catch (error) {
             messageTextElement.innerHTML += `<br>[Error]: Failed to trigger workflow: ${error.message}<br>`;
@@ -518,10 +518,10 @@
                 //7. Delete the temporary temp.md file
                 const CommitMessage2 = "Delete temp.md";
                 await DeleteFileInBranch(octokit, myRepoOwner, myRepoName, newBranchName, filePath, CommitMessage2);
-                //8. Trigger the workflow in the forked repository (only if triggerWorkflow is true)
+                //8. Trigger the workflow in the repository where the empty PR was created (only if triggerWorkflow is true)
                 if (triggerWorkflow) {
                     const sourcePRURL = `https://github.com/${currentRepoOwner}/${currentRepoName}/pull/${currentPRNumber}`;
-                    await TriggerWorkflow(octokit, messageTextElement, myRepoOwner, myRepoName, baseBranch, sourcePRURL, targetPRURL);
+                    await TriggerWorkflow(octokit, messageTextElement, targetRepoOwner, targetRepoName, baseBranch, sourcePRURL, targetPRURL);
                 } else {
                     messageTextElement.innerHTML += `<br>[Info]: Translation PR created successfully without triggering the workflow.<br>`;
                 }
