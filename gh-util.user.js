@@ -369,8 +369,7 @@
                 ref: baseBranch,
                 inputs: {
                     source_pr_url: sourcePRURL,
-                    target_pr_url: targetPRURL,
-                    ai_provider: 'gemini'
+                    target_pr_url: targetPRURL
                 }
             };
 
