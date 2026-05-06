@@ -791,18 +791,41 @@
         UpdateScrollButtonVisibility();
       }
 
+      function IsHiddenElement(element) {
+        return element.closest('[hidden], [aria-hidden="true"]');
+      }
+
+      function FindPRHeaderActions() {
+        const selectors = [
+          '[data-component="PH_Actions"]',
+          '.gh-header-actions',
+        ];
+        const candidates = selectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)));
+        const visibleCandidate = candidates.find((element) => !IsHiddenElement(element) && element.getClientRects().length > 0);
+        if (visibleCandidate) {
+          return visibleCandidate;
+        }
+        const availableCandidate = candidates.find((element) => !IsHiddenElement(element));
+        if (availableCandidate) {
+          return availableCandidate;
+        }
+        return null;
+      }
+
       function EnsureCreateTransPRButtonOnPR() {
         const MARK = 'create-trans-pr-button';
 
-        // Check if the button already exists
-        if (document.querySelector(`div[${ATTR}="${MARK}"]`)) {
+        var headerActions = FindPRHeaderActions();
+        if (!headerActions) {
           return;
         }
 
-        // Find the header actions container
-        var headerActions = document.querySelector(".gh-header-actions");
-
-        if (!headerActions) {
+        // Reuse the existing dropdown if GitHub navigation rendered a better header target.
+        var existingDropdownContainer = document.querySelector(`div[${ATTR}="${MARK}"]`);
+        if (existingDropdownContainer) {
+          if (!headerActions.contains(existingDropdownContainer)) {
+            headerActions.appendChild(existingDropdownContainer);
+          }
           return;
         }
 
