@@ -812,6 +812,65 @@
         return null;
       }
 
+      function FindHeaderActionButtonStyleSource(headerActions, dropdownContainer) {
+        const candidates = Array.from(headerActions.querySelectorAll('button, a.Button, summary.Button, [role="button"]'));
+        return candidates.find((element) => {
+          if (dropdownContainer.contains(element)) {
+            return false;
+          }
+          if (IsHiddenElement(element) || element.getClientRects().length === 0) {
+            return false;
+          }
+          if (element.matches('.Button--invisible, [data-variant="invisible"]')) {
+            return false;
+          }
+          return element.textContent.trim().length > 0;
+        });
+      }
+
+      function SyncHeaderActionButtonSize(button, headerActions, dropdownContainer) {
+        const source = FindHeaderActionButtonStyleSource(headerActions, dropdownContainer);
+        if (!source) {
+          return;
+        }
+
+        const sourceStyle = window.getComputedStyle(source);
+        const sourceRect = source.getBoundingClientRect();
+        const properties = [
+          'alignItems',
+          'borderRadius',
+          'boxSizing',
+          'display',
+          'fontSize',
+          'fontWeight',
+          'justifyContent',
+          'lineHeight',
+          'minHeight',
+          'paddingBottom',
+          'paddingLeft',
+          'paddingRight',
+          'paddingTop',
+          'verticalAlign',
+        ];
+
+        properties.forEach((property) => {
+          if (sourceStyle[property]) {
+            button.style[property] = sourceStyle[property];
+          }
+        });
+        if (sourceRect.height > 0) {
+          button.style.height = `${sourceRect.height}px`;
+        }
+        button.style.margin = "0";
+        button.style.whiteSpace = "nowrap";
+
+        const trailingAction = button.querySelector('.Button-trailingAction');
+        if (trailingAction) {
+          trailingAction.style.display = "inline-flex";
+          trailingAction.style.alignItems = "center";
+        }
+      }
+
       function EnsureCreateTransPRButtonOnPR() {
         const MARK = 'create-trans-pr-button';
 
@@ -825,6 +884,10 @@
         if (existingDropdownContainer) {
           if (!headerActions.contains(existingDropdownContainer)) {
             headerActions.appendChild(existingDropdownContainer);
+          }
+          var existingButton = existingDropdownContainer.querySelector("button");
+          if (existingButton) {
+            SyncHeaderActionButtonSize(existingButton, headerActions, existingDropdownContainer);
           }
           return;
         }
@@ -928,6 +991,7 @@
 
         // Append container to header actions
         headerActions.appendChild(dropdownContainer);
+        SyncHeaderActionButtonSize(button, headerActions, dropdownContainer);
       }
 
     function Init() {
