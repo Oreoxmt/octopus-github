@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Octopus GitHub
-// @version      0.90
+// @version      0.91
 // @description  A userscript for GitHub
 // @author       Oreo
 // @homepage     https://github.com/Oreoxmt/octopus-github
@@ -20,6 +20,63 @@
     const ATTR = 'octopus-github-util-mark'
     const STORAGEKEY = 'octopus-github-util:token'
     const TARGET_REPO_OWNER = 'pingcap'
+    const observerState = {
+        pullList: { observer: null, target: null },
+        prDetails: { observer: null, target: null },
+        createTranslationPR: { observer: null, target: null },
+    }
+
+    function IsPRListPage(pathname = window.location.pathname) {
+        return pathname.includes('/pulls');
+    }
+
+    function IsPRDetailsPage(pathname = window.location.pathname) {
+        return pathname.includes('/pull/');
+    }
+
+    function IsTranslationPRPage(pathname = window.location.pathname) {
+        return pathname.includes(`/${TARGET_REPO_OWNER}/docs-cn/pull/`) || pathname.includes(`/${TARGET_REPO_OWNER}/docs/pull/`);
+    }
+
+    function DisconnectObserver(state) {
+        if (state.observer) {
+            state.observer.disconnect();
+            state.observer = null;
+            state.target = null;
+        }
+    }
+
+    function EnsureObserver(state, targetNode, observerOptions, callback) {
+        if (state.observer && state.target === targetNode) {
+            return;
+        }
+        DisconnectObserver(state);
+        state.observer = new MutationObserver(callback);
+        state.observer.observe(targetNode, observerOptions);
+        state.target = targetNode;
+    }
+
+    let scrollButtonVisibilityListenerRegistered = false;
+
+    function UpdateScrollButtonVisibility() {
+        const topButton = document.querySelector(`button[${ATTR}="scroll-to-top-button"]`);
+        if (topButton) {
+            topButton.style.display = window.pageYOffset > 0 ? "block" : "none";
+        }
+
+        const bottomButton = document.querySelector(`button[${ATTR}="scroll-to-bottom-button"]`);
+        if (bottomButton) {
+            bottomButton.style.display = window.pageYOffset + window.innerHeight < document.body.scrollHeight ? "block" : "none";
+        }
+    }
+
+    function EnsureScrollButtonVisibilityListener() {
+        if (scrollButtonVisibilityListenerRegistered) {
+            return;
+        }
+        window.addEventListener("scroll", UpdateScrollButtonVisibility);
+        scrollButtonVisibilityListenerRegistered = true;
+    }
 
     function GetRepositoryInformation() {
         // Get the pathname of the current page
@@ -698,14 +755,8 @@
         // add the button to the page
         document.body.appendChild(button);
 
-        // show the button only when not at the top
-        window.addEventListener("scroll", function() {
-            if (window.pageYOffset > 0) {
-              button.style.display = "block";
-            } else {
-              button.style.display = "none";
-            }
-          });
+        EnsureScrollButtonVisibilityListener();
+        UpdateScrollButtonVisibility();
     }
 
     // This function creates a button that scrolls to bottom of the page
@@ -736,28 +787,127 @@
         // add the button to the page
         document.body.appendChild(button);
 
-        // show the button only when not at the bottom
-        window.addEventListener("scroll", function() {
-          if (window.pageYOffset + window.innerHeight < document.body.scrollHeight) {
-            button.style.display = "block";
-          } else {
-            button.style.display = "none";
+        EnsureScrollButtonVisibilityListener();
+        UpdateScrollButtonVisibility();
+      }
+
+      function IsHiddenElement(element) {
+        return element.closest('[hidden], [aria-hidden="true"]');
+      }
+
+      function FindPRHeaderActions() {
+        const selectors = [
+          '[data-component="PH_Actions"]',
+          '.gh-header-actions',
+        ];
+        const candidates = selectors.flatMap((selector) => Array.from(document.querySelectorAll(selector)));
+        const visibleCandidate = candidates.find((element) => !IsHiddenElement(element) && element.getClientRects().length > 0);
+        if (visibleCandidate) {
+          return visibleCandidate;
+        }
+        const availableCandidate = candidates.find((element) => !IsHiddenElement(element));
+        if (availableCandidate) {
+          return availableCandidate;
+        }
+        return null;
+      }
+
+      const HEADER_ACTION_BUTTON_SIZE_PROPERTIES = [
+        'alignItems',
+        'borderRadius',
+        'boxSizing',
+        'display',
+        'fontSize',
+        'fontWeight',
+        'height',
+        'justifyContent',
+        'lineHeight',
+        'margin',
+        'minHeight',
+        'paddingBottom',
+        'paddingLeft',
+        'paddingRight',
+        'paddingTop',
+        'verticalAlign',
+        'whiteSpace',
+      ];
+
+      function FindHeaderActionButtonStyleSource(headerActions, dropdownContainer) {
+        const candidates = Array.from(headerActions.querySelectorAll('button[data-component="Button"], [data-component="IconButton"]'));
+        return candidates.find((element) => {
+          if (dropdownContainer.contains(element)) {
+            return false;
+          }
+          if (IsHiddenElement(element) || element.getClientRects().length === 0) {
+            return false;
+          }
+          if (element.matches('.Button--invisible, [data-variant="invisible"]')) {
+            return false;
+          }
+          return element.textContent.trim().length > 0;
+        });
+      }
+
+      function ResetHeaderActionButtonSize(button) {
+        HEADER_ACTION_BUTTON_SIZE_PROPERTIES.forEach((property) => {
+          button.style[property] = "";
+        });
+        const trailingAction = button.querySelector('.Button-trailingAction');
+        if (trailingAction) {
+          trailingAction.style.display = "";
+          trailingAction.style.alignItems = "";
+        }
+      }
+
+      function SyncHeaderActionButtonSize(button, headerActions, dropdownContainer) {
+        ResetHeaderActionButtonSize(button);
+        if (!headerActions.matches('[data-component="PH_Actions"]')) {
+          return;
+        }
+
+        const source = FindHeaderActionButtonStyleSource(headerActions, dropdownContainer);
+        if (!source) {
+          return;
+        }
+
+        const sourceStyle = window.getComputedStyle(source);
+        const sourceRect = source.getBoundingClientRect();
+        HEADER_ACTION_BUTTON_SIZE_PROPERTIES.forEach((property) => {
+          if (sourceStyle[property]) {
+            button.style[property] = sourceStyle[property];
           }
         });
+        if (sourceRect.height > 0) {
+          button.style.height = `${sourceRect.height}px`;
+        }
+        button.style.margin = "0";
+        button.style.whiteSpace = "nowrap";
+
+        const trailingAction = button.querySelector('.Button-trailingAction');
+        if (trailingAction) {
+          trailingAction.style.display = "inline-flex";
+          trailingAction.style.alignItems = "center";
+        }
       }
 
       function EnsureCreateTransPRButtonOnPR() {
         const MARK = 'create-trans-pr-button';
 
-        // Check if the button already exists
-        if (document.querySelector(`div[${ATTR}="${MARK}"]`)) {
+        var headerActions = FindPRHeaderActions();
+        if (!headerActions) {
           return;
         }
 
-        // Find the header actions container
-        var headerActions = document.querySelector(".gh-header-actions");
-
-        if (!headerActions) {
+        // Reuse the existing dropdown if GitHub navigation rendered a better header target.
+        var existingDropdownContainer = document.querySelector(`div[${ATTR}="${MARK}"]`);
+        if (existingDropdownContainer) {
+          if (!headerActions.contains(existingDropdownContainer)) {
+            headerActions.appendChild(existingDropdownContainer);
+          }
+          var existingButton = existingDropdownContainer.querySelector("button");
+          if (existingButton) {
+            SyncHeaderActionButtonSize(existingButton, headerActions, existingDropdownContainer);
+          }
           return;
         }
 
@@ -860,48 +1010,70 @@
 
         // Append container to header actions
         headerActions.appendChild(dropdownContainer);
+        SyncHeaderActionButtonSize(button, headerActions, dropdownContainer);
       }
 
     function Init() {
 
-        const url = window.location.href;
+        const pathname = window.location.pathname;
+        const observerOptions = { childList: true, subtree: true };
 
         // If we are on the PR list page, add the comment button and file link
-        if (url.includes('/pulls')) {
-            const observer = new MutationObserver(() => {
+        if (IsPRListPage(pathname)) {
+            document.querySelectorAll('div[id^="issue_"]').forEach((element) => {
+                EnsureFileLink(element);
+            })
+            EnsureCommentButton();
+
+            EnsureObserver(observerState.pullList, document, observerOptions, () => {
                 document.querySelectorAll('div[id^="issue_"]').forEach((element) => {
                     EnsureFileLink(element);
                 })
                 EnsureCommentButton();
             });
-            const config = { childList: true, subtree: true };
-            observer.observe(document, config);
+        } else {
+            DisconnectObserver(observerState.pullList);
         }
 
         // If we are on the PR details page, add the scroll to top and bottom buttons
-        if (url.includes('/pull/')) {
+        if (IsPRDetailsPage(pathname)) {
             EnsureScrollToTopButton();
             EnsureScrollToBottomButton();
             EnsureCommentButtonOnPR();
 
-            const observer = new MutationObserver(() => {
+            const targetNode = document.body;
+            EnsureObserver(observerState.prDetails, targetNode, observerOptions, () => {
                 EnsureCommentButtonOnPR();
             });
-            const targetNode = document.body;
-            const observerOptions = { childList: true, subtree: true };
-            observer.observe(targetNode, observerOptions);
 
             // If we are on the PR details page of pingcap/docs-cn or pingcap/docs, add the CreateTranslationPR button
-            if (url.includes(`${TARGET_REPO_OWNER}/docs-cn/pull`) || url.includes(`${TARGET_REPO_OWNER}/docs/pull`)) {
+            if (IsTranslationPRPage(pathname)) {
                 EnsureCreateTransPRButtonOnPR();
-                const observerCreateTransPR = new MutationObserver(() => {
-                    EnsureCreateTransPRButtonOnPR();
+                EnsureObserver(observerState.createTranslationPR, targetNode, observerOptions, () => {
+                    if (IsTranslationPRPage()) {
+                        EnsureCreateTransPRButtonOnPR();
+                    }
                 });
-                observerCreateTransPR.observe(targetNode, observerOptions);
+            } else {
+                DisconnectObserver(observerState.createTranslationPR);
             }
 
+        } else {
+            DisconnectObserver(observerState.prDetails);
+            DisconnectObserver(observerState.createTranslationPR);
         }
     }
 
-    Init();
+    function InitWhenReady() {
+        if (document.body) {
+            Init();
+            return;
+        }
+        // Only needed for the initial document-start run before GitHub creates the body.
+        document.addEventListener('DOMContentLoaded', Init, { once: true });
+    }
+
+    InitWhenReady();
+    document.addEventListener('turbo:load', InitWhenReady);
+    document.addEventListener('pjax:end', InitWhenReady);
 })();
