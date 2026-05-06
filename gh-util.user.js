@@ -812,8 +812,28 @@
         return null;
       }
 
+      const HEADER_ACTION_BUTTON_SIZE_PROPERTIES = [
+        'alignItems',
+        'borderRadius',
+        'boxSizing',
+        'display',
+        'fontSize',
+        'fontWeight',
+        'height',
+        'justifyContent',
+        'lineHeight',
+        'margin',
+        'minHeight',
+        'paddingBottom',
+        'paddingLeft',
+        'paddingRight',
+        'paddingTop',
+        'verticalAlign',
+        'whiteSpace',
+      ];
+
       function FindHeaderActionButtonStyleSource(headerActions, dropdownContainer) {
-        const candidates = Array.from(headerActions.querySelectorAll('button, a.Button, summary.Button, [role="button"]'));
+        const candidates = Array.from(headerActions.querySelectorAll('button[data-component="Button"], [data-component="IconButton"]'));
         return candidates.find((element) => {
           if (dropdownContainer.contains(element)) {
             return false;
@@ -828,7 +848,23 @@
         });
       }
 
+      function ResetHeaderActionButtonSize(button) {
+        HEADER_ACTION_BUTTON_SIZE_PROPERTIES.forEach((property) => {
+          button.style[property] = "";
+        });
+        const trailingAction = button.querySelector('.Button-trailingAction');
+        if (trailingAction) {
+          trailingAction.style.display = "";
+          trailingAction.style.alignItems = "";
+        }
+      }
+
       function SyncHeaderActionButtonSize(button, headerActions, dropdownContainer) {
+        ResetHeaderActionButtonSize(button);
+        if (!headerActions.matches('[data-component="PH_Actions"]')) {
+          return;
+        }
+
         const source = FindHeaderActionButtonStyleSource(headerActions, dropdownContainer);
         if (!source) {
           return;
@@ -836,24 +872,7 @@
 
         const sourceStyle = window.getComputedStyle(source);
         const sourceRect = source.getBoundingClientRect();
-        const properties = [
-          'alignItems',
-          'borderRadius',
-          'boxSizing',
-          'display',
-          'fontSize',
-          'fontWeight',
-          'justifyContent',
-          'lineHeight',
-          'minHeight',
-          'paddingBottom',
-          'paddingLeft',
-          'paddingRight',
-          'paddingTop',
-          'verticalAlign',
-        ];
-
-        properties.forEach((property) => {
+        HEADER_ACTION_BUTTON_SIZE_PROPERTIES.forEach((property) => {
           if (sourceStyle[property]) {
             button.style[property] = sourceStyle[property];
           }
