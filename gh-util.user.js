@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Octopus GitHub
-// @version      0.91
+// @version      0.92
 // @description  A userscript for GitHub
 // @author       Oreo
 // @homepage     https://github.com/Oreoxmt/octopus-github
@@ -256,26 +256,47 @@
         }
     }
 
-    // This function can be used to create a temp file in your specified branch
-    async function CreateFileInBranch(octokit, messageTextElement, repoOwner, repoName, branchName, filePath, fileContent, commitMessage) {
+    // Creates an empty commit on the given branch so the PR has a diff against its base.
+    async function CreateEmptyCommit(octokit, messageTextElement, repoOwner, repoName, branchName, commitMessage) {
         try {
-            const contentBase64 = btoa(fileContent);
-            const response = await octokit.repos.createFile({
+            const branchRef = await octokit.gitdata.getReference({
                 owner: repoOwner,
                 repo: repoName,
-                branch: branchName,
-                path: filePath,
+                ref: `heads/${branchName}`,
+                headers: {'Authorization': `Bearer ${EnsureToken()}`}
+            });
+            const parentSha = branchRef.data.object.sha;
+
+            const parentCommit = await octokit.gitdata.getCommit({
+                owner: repoOwner,
+                repo: repoName,
+                sha: parentSha,
+                headers: {'Authorization': `Bearer ${EnsureToken()}`}
+            });
+            const treeSha = parentCommit.data.tree.sha;
+
+            const newCommit = await octokit.gitdata.createCommit({
+                owner: repoOwner,
+                repo: repoName,
                 message: commitMessage,
-                content: contentBase64,
+                tree: treeSha,
+                parents: [parentSha],
                 headers: {'Authorization': `Bearer ${EnsureToken()}`}
             });
 
-            console.log('A temp file is created successfully!');
+            await octokit.gitdata.updateReference({
+                owner: repoOwner,
+                repo: repoName,
+                ref: `heads/${branchName}`,
+                sha: newCommit.data.sha,
+                headers: {'Authorization': `Bearer ${EnsureToken()}`}
+            });
 
+            console.log('An empty commit is created successfully!');
         } catch (error) {
-            //console.log('Failed to create the temp file.');
-            messageTextElement.innerHTML += `<br>[Error]: Failed to create a temp file in the new branch: ${error.message}<br>`;
+            messageTextElement.innerHTML += `<br>[Error]: Failed to create an empty commit on the new branch: ${error.message}<br>`;
             console.error(error);
+            throw error;
         }
     }
 
@@ -341,33 +362,6 @@
             console.log('Failed to create the translation PR.');
             messageTextElement.innerHTML += `<br>[Error]: Failed to create the translation PR: ${error.message}<br>`;
             console.error(error);
-        }
-    }
-
-    async function DeleteFileInBranch(octokit, repoOwner, repoName, branchName, filePath, commitMessage) {
-        try {
-            const { data: fileInfo } = await octokit.repos.getContent({
-                owner: repoOwner,
-                repo: repoName,
-                path: filePath,
-                ref: branchName,
-                headers: {'Authorization': `Bearer ${EnsureToken()}`}
-            });
-
-            await octokit.repos.deleteFile({
-                owner: repoOwner,
-                repo: repoName,
-                path: filePath,
-                message: commitMessage,
-                sha: fileInfo.sha,
-                branch: branchName,
-                headers: {'Authorization': `Bearer ${EnsureToken()}`}
-            });
-
-            console.log("The temp.md is deleted successfully!");
-        } catch (error) {
-            console.log(`Failed to delete temp.md. Error message: ${error.message}`);
-            throw error;
         }
     }
 
@@ -448,7 +442,7 @@
             if (!response.ok) {
                 const errorText = await response.text();
                 console.log(`Response error text:`, errorText);
-                
+
                 // Provide helpful error message for common issues
                 if (response.status === 422) {
                     messageTextElement.innerHTML += `<br>[Error]: Failed to trigger workflow in ${workflowRepoOwner}/${workflowRepoName}.<br>`;
@@ -459,7 +453,7 @@
                     messageTextElement.innerHTML += `3. GitHub Actions is enabled in the repository settings<br>`;
                     return;
                 }
-                
+
                 throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
             }
 
@@ -564,21 +558,15 @@
                 //4. Create a new branch in the repository that I forked
                 const newBranchName = `${headBranch}-${currentPRNumber}`;
                 await CreateBranch(octokit, messageTextElement, myRepoOwner, myRepoName, newBranchName, baseBranch);
-                //5. Create a temporary temp.md file in the new branch
-                const filePath = "temp.md";
-                const FileContent = "This is a test file.";
-                const CommitMessage = "Add temp.md";
-                await CreateFileInBranch(octokit, messageTextElement, myRepoOwner, myRepoName, newBranchName, filePath, FileContent, CommitMessage);
+                //5. Create an empty commit on the new branch so the PR has a diff against its base
+                await CreateEmptyCommit(octokit, messageTextElement, myRepoOwner, myRepoName, newBranchName, "Create empty translation PR");
                 //6. Create a pull request
                 const title = sourceTitle;
                 const body = UpdatePRDescription(currentRepoOwner, currentRepoName, currentPRNumber, sourceDescription, targetRepoName);
                 targetLabels.push(translationLabel);
                 const labels = targetLabels;
                 const targetPRURL = await CreatePullRequest(octokit, messageTextElement, targetRepoOwner, targetRepoName, baseBranch, myRepoOwner, myRepoName, newBranchName, title, body, labels);
-                //7. Delete the temporary temp.md file
-                const CommitMessage2 = "Delete temp.md";
-                await DeleteFileInBranch(octokit, myRepoOwner, myRepoName, newBranchName, filePath, CommitMessage2);
-                //8. Trigger the workflow in the repository where the empty PR was created (only if triggerWorkflow is true)
+                //7. Trigger the workflow in the repository where the empty PR was created (only if triggerWorkflow is true)
                 if (triggerWorkflow) {
                     const sourcePRURL = `https://github.com/${currentRepoOwner}/${currentRepoName}/pull/${currentPRNumber}`;
                     await TriggerWorkflow(octokit, messageTextElement, targetRepoOwner, targetRepoName, baseBranch, sourcePRURL, targetPRURL);
