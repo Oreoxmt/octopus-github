@@ -417,7 +417,7 @@
             const workflowDispatchUrl = `https://api.github.com/repos/${workflowRepoOwner}/${workflowRepoName}/actions/workflows/${workflowFileName}/dispatches`;
 
             const requestBody = {
-                ref: baseBranch,
+                ref: "master",
                 inputs: {
                     source_pr_url: sourcePRURL,
                     target_pr_url: targetPRURL
