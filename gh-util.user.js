@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Octopus GitHub
-// @version      0.92
+// @version      0.93
 // @description  A userscript for GitHub
 // @author       Oreo
 // @homepage     https://github.com/Oreoxmt/octopus-github
@@ -417,7 +417,7 @@
             const workflowDispatchUrl = `https://api.github.com/repos/${workflowRepoOwner}/${workflowRepoName}/actions/workflows/${workflowFileName}/dispatches`;
 
             const requestBody = {
-                ref: baseBranch,
+                ref: "master",
                 inputs: {
                     source_pr_url: sourcePRURL,
                     target_pr_url: targetPRURL
